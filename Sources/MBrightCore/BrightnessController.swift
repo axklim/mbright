@@ -11,19 +11,26 @@ public struct BrightnessController {
         self.backend = backend
     }
 
-    /// Every display with its current brightness; nil percent means the
-    /// display reports no brightness control.
+    /// Every display with its current brightness state. Distinguishes a
+    /// display that reports no brightness control from one where the read
+    /// itself failed — collapsing those into the same nil-like state would
+    /// hide a real I/O failure behind a benign capability report.
     public func readings() throws -> [DisplayReading] {
         try enumerator.onlineDisplays().map { display in
             guard backend.canChangeBrightness(display.id) else {
-                return DisplayReading(display: display, percent: nil)
+                return DisplayReading(display: display, state: .unsupported)
             }
-            let value = try? backend.getBrightness(display.id)
-            return DisplayReading(display: display, percent: value.map(Percent.fromDevice))
+            do {
+                let value = try backend.getBrightness(display.id)
+                return DisplayReading(display: display, state: .percent(Percent.fromDevice(value)))
+            } catch {
+                return DisplayReading(display: display, state: .failed("\(error)"))
+            }
         }
     }
 
     public func get(_ target: Target) throws -> Int {
+        guard target != .all else { throw MBrightError.getDoesNotSupportAll }
         let display = try resolve(target)[0]
         try ensureSupported(display)
         return Percent.fromDevice(try backend.getBrightness(display.id))

@@ -19,13 +19,22 @@ public enum Target: Equatable, Sendable {
     case selector(String)
 }
 
-/// A display paired with its current brightness, or nil if unsupported.
+/// Brightness as reported for one display.
+public enum BrightnessState: Equatable, Sendable {
+    case percent(Int)
+    /// The display reports no brightness control.
+    case unsupported
+    /// Brightness control is reported available, but the read failed.
+    case failed(String)
+}
+
+/// A display paired with its current brightness state.
 public struct DisplayReading: Equatable, Sendable {
     public let display: DisplayInfo
-    public let percent: Int?
+    public let state: BrightnessState
 
-    public init(display: DisplayInfo, percent: Int?) {
+    public init(display: DisplayInfo, state: BrightnessState) {
         self.display = display
-        self.percent = percent
+        self.state = state
     }
 }

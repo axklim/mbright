@@ -14,6 +14,29 @@ private func controller(
     #expect(try sut.get(.main) == 37)
 }
 
+@Test func getMainSelectsIsMainDisplayNotArrayPosition() throws {
+    // studio (isMain: true) is second in the array here, so a naive
+    // "first element" implementation would return ultrafine's value instead.
+    let backend = FakeBackend(values: [3: 0.37, 2: 0.49])
+    let (sut, _) = controller(FakeEnumerator([ultrafine, studio]), backend)
+    #expect(try sut.get(.main) == 37)
+}
+
+@Test func getMainFallsBackToFirstDisplayWhenNoneIsMain() throws {
+    let first = DisplayInfo(index: 0, id: 10, name: "Display A", vendor: "APP", isMain: false)
+    let second = DisplayInfo(index: 1, id: 20, name: "Display B", vendor: "APP", isMain: false)
+    let backend = FakeBackend(values: [10: 0.42, 20: 0.77])
+    let (sut, _) = controller(FakeEnumerator([first, second]), backend)
+    #expect(try sut.get(.main) == 42)
+}
+
+@Test func getAllThrowsBecauseGetReportsOnlyOneDisplay() {
+    let (sut, _) = controller()
+    #expect(throws: MBrightError.getDoesNotSupportAll) {
+        try sut.get(.all)
+    }
+}
+
 @Test func getBySelectorReadsThatDisplay() throws {
     let backend = FakeBackend(values: [3: 0.37, 2: 0.49])
     let (sut, _) = controller(FakeEnumerator(), backend)
@@ -77,15 +100,22 @@ private func controller(
     #expect(backend.values[2] == 0.3)
 }
 
-@Test func readingsReportNilForUnsupportedDisplays() throws {
-    let backend = FakeBackend(values: [3: 0.4, 2: 0.6])
+@Test func readingsDistinguishUnsupportedFromFailed() throws {
+    // Three displays, three outcomes: a healthy read, a display that
+    // reports no brightness control, and a display whose read throws.
+    // Collapsing "unsupported" and "read failed" into the same nil-like
+    // state would hide a real I/O failure behind a benign capability report.
+    let thirdDisplay = DisplayInfo(index: 2, id: 99, name: "Third Display", vendor: "APP", isMain: false)
+    let backend = FakeBackend(values: [3: 0.4, 2: 0.6, 99: 0.5])
     backend.unsupported = [2]
-    let (sut, _) = controller(FakeEnumerator(), backend)
+    backend.failing = [99]
+    let (sut, _) = controller(FakeEnumerator([studio, ultrafine, thirdDisplay]), backend)
 
     let readings = try sut.readings()
-    #expect(readings.count == 2)
-    #expect(readings[0].percent == 40)
-    #expect(readings[1].percent == nil)
+    #expect(readings.count == 3)
+    #expect(readings[0].state == .percent(40))
+    #expect(readings[1].state == .unsupported)
+    #expect(readings[2].state == .failed("Brightness operation failed on '99' (code -1)"))
 }
 
 @Test func emptyDisplayListThrows() {

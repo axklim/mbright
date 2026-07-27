@@ -8,6 +8,7 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible {
     case noMatch(selector: String, available: [String])
     case ambiguousSelector(selector: String, candidates: [String])
     case partialFailure(failures: [String])
+    case getDoesNotSupportAll
 
     public var description: String {
         switch self {
@@ -32,6 +33,8 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible {
             return "'\(selector)' matches multiple displays: \(candidates.joined(separator: ", ")). Be more specific."
         case let .partialFailure(failures):
             return "Some displays failed:\n  " + failures.joined(separator: "\n  ")
+        case .getDoesNotSupportAll:
+            return "get reports a single display; use 'mbright list' for all displays"
         }
     }
 }

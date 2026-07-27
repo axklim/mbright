@@ -16,9 +16,9 @@ public final class DisplayServicesBackend: BrightnessBackend, @unchecked Sendabl
     private let canChangeFn: CanChangeFn
     private let getFn: GetFn
     private let setFn: SetFn
-    /// Bound opportunistically for a future --fade flag. Deliberately optional:
-    /// v1 never calls it, so a missing symbol must not break the tool.
-    private let _setSmoothFn: SetFn?
+    /// Bound for a future --fade flag. Deliberately optional and never required:
+    /// v1 does not call it, so a missing symbol must not break the whole tool.
+    private let setSmoothFn: SetFn?
 
     public init() throws {
         guard let handle = dlopen(Self.frameworkPath, RTLD_LAZY) else {
@@ -42,7 +42,7 @@ public final class DisplayServicesBackend: BrightnessBackend, @unchecked Sendabl
         canChangeFn = try required("DisplayServicesCanChangeBrightness", as: CanChangeFn.self)
         getFn = try required("DisplayServicesGetBrightness", as: GetFn.self)
         setFn = try required("DisplayServicesSetBrightness", as: SetFn.self)
-        _setSmoothFn = optional("DisplayServicesSetBrightnessSmooth", as: SetFn.self)
+        setSmoothFn = optional("DisplayServicesSetBrightnessSmooth", as: SetFn.self)
     }
 
     public func canChangeBrightness(_ id: CGDirectDisplayID) -> Bool {
@@ -50,9 +50,16 @@ public final class DisplayServicesBackend: BrightnessBackend, @unchecked Sendabl
     }
 
     public func getBrightness(_ id: CGDirectDisplayID) throws -> Float {
-        var value: Float = 0
+        // Sentinel: a successful call that never writes the out-parameter must be
+        // detectable, not indistinguishable from a fully dark display.
+        var value: Float = -1
         let code = getFn(id, &value)
         guard code == 0 else {
+            throw MBrightError.operationFailed(display: "\(id)", code: code)
+        }
+        // DisplayServices is private API with no documented contract. A malformed
+        // success must become a typed error, never a trap in Percent.fromDevice.
+        guard value.isFinite, (0...1).contains(value) else {
             throw MBrightError.operationFailed(display: "\(id)", code: code)
         }
         return value

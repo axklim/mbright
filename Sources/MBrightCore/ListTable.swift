@@ -14,19 +14,31 @@ public enum ListTable {
             ]
         }
 
+        let allRows = [header] + rows
+        let lastColumn = header.count - 1
         let widths = (0..<header.count).map { column in
-            ([header] + rows).map { $0[column].count }.max() ?? 0
+            allRows.map { $0[column].count }.max() ?? 0
         }
 
-        return ([header] + rows)
-            .map { row in
-                row.enumerated()
-                    .map { $0.offset == row.count - 1
-                        ? $0.element
-                        : $0.element.padding(toLength: widths[$0.offset] + 2, withPad: " ", startingAt: 0) }
-                    .joined()
-            }
-            .joined(separator: "\n")
+        let lines: [String] = allRows.map { row in renderLine(row, widths: widths, lastColumn: lastColumn) }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func renderLine(_ row: [String], widths: [Int], lastColumn: Int) -> String {
+        var line = ""
+        for (column, value) in row.enumerated() {
+            line += pad(value, to: widths[column], isLast: column == lastColumn)
+        }
+        return line
+    }
+
+    /// Pads `cell` with spaces up to `width + 2`, measuring and padding in
+    /// grapheme clusters throughout so multi-code-unit characters (combining
+    /// marks, most emoji) are never truncated.
+    private static func pad(_ cell: String, to width: Int, isLast: Bool) -> String {
+        guard !isLast else { return cell }
+        let deficit = max(0, width + 2 - cell.count)
+        return cell + String(repeating: " ", count: deficit)
     }
 
     private static func cell(for state: BrightnessState) -> String {

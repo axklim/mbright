@@ -116,7 +116,7 @@ names are stable, **scripts should prefer name substrings** (`-d studio`,
 ./scripts/test.sh             # NOT bare `swift test` — see below
 ```
 
-33 tests, none requiring hardware. Most are pure-function tests; the controller tests run against a fake `BrightnessBackend`.
+48 tests, none requiring hardware. Most are pure-function tests; the controller tests run against a fake `BrightnessBackend`.
 
 Swift Testing ships with Command Line Tools but is not on SwiftPM's default
 search path, so `scripts/test.sh` supplies the framework and rpath flags. Bare

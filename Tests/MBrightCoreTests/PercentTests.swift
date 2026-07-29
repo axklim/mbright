@@ -20,6 +20,14 @@ import Testing
     #expect(Percent.fromDevice(0.374) == 37)
 }
 
+@Test func fromDeviceRoundsNearTopOfRange() {
+    // The spec's boundary set is 0/1/99/100; existing tests cover 0 and
+    // 100 but nothing near the top of the range short of the exact
+    // ceiling.
+    #expect(Percent.fromDevice(0.99) == 99)
+    #expect(Percent.fromDevice(0.995) == 100)
+}
+
 @Test func clampBoundsToZeroHundred() {
     #expect(Percent.clamp(-5) == 0)
     #expect(Percent.clamp(0) == 0)

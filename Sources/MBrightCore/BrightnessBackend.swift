@@ -19,6 +19,16 @@ public enum Target: Equatable, Sendable {
     case selector(String)
 }
 
+extension Target {
+    /// Resolves CLI flags to a target. `display` and `all` are mutually exclusive.
+    public static func resolve(display: String?, all: Bool) throws -> Target {
+        if all, display != nil { throw MBrightError.conflictingTargetFlags }
+        if all { return .all }
+        if let display { return .selector(display) }
+        return .main
+    }
+}
+
 /// Brightness as reported for one display.
 public enum BrightnessState: Equatable, Sendable {
     case percent(Int)

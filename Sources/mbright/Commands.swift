@@ -36,10 +36,13 @@ struct GetCommand: ParsableCommand {
 
     @OptionGroup var target: TargetOptions
 
-    func run() throws {
-        if target.all {
+    func validate() throws {
+        guard !target.all else {
             throw ValidationError("get does not support --all; use 'mbright list'.")
         }
+    }
+
+    func run() throws {
         print(try makeController().get(try target.resolvedTarget()))
     }
 }

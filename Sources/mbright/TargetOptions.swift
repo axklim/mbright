@@ -9,13 +9,16 @@ struct TargetOptions: ParsableArguments {
     @Flag(name: .long, help: "Apply to every online display.")
     var all = false
 
+    func validate() throws {
+        _ = try resolvedTarget()
+    }
+
     func resolvedTarget() throws -> Target {
-        if all, display != nil {
+        do {
+            return try Target.resolve(display: display, all: all)
+        } catch MBrightError.conflictingTargetFlags {
             throw ValidationError("--display and --all are mutually exclusive.")
         }
-        if all { return .all }
-        if let display { return .selector(display) }
-        return .main
     }
 }
 

@@ -16,7 +16,10 @@ public struct BrightnessController {
     /// itself failed — collapsing those into the same nil-like state would
     /// hide a real I/O failure behind a benign capability report.
     public func readings() throws -> [DisplayReading] {
-        try enumerator.onlineDisplays().map { display in
+        let displays = try enumerator.onlineDisplays()
+        guard !displays.isEmpty else { throw MBrightError.noDisplays }
+
+        return displays.map { display in
             guard backend.canChangeBrightness(display.id) else {
                 return DisplayReading(display: display, state: .unsupported)
             }

@@ -88,13 +88,38 @@ private func controller(
     }
 }
 
+@Test func getOnUnsupportedDisplayThrows() {
+    // An unsupported main display is a realistic configuration -- get()
+    // hits ensureSupported directly, not through apply()'s per-display
+    // catch, so this path needs its own coverage.
+    let backend = FakeBackend()
+    backend.unsupported = [3]
+    let (sut, _) = controller(FakeEnumerator(), backend)
+    #expect(throws: MBrightError.brightnessUnsupported(display: "Studio Display")) {
+        try sut.get(.main)
+    }
+}
+
 @Test func allContinuesPastFailureThenThrows() {
     let backend = FakeBackend()
     backend.failing = [3]
     let (sut, _) = controller(FakeEnumerator(), backend)
 
-    #expect(throws: MBrightError.self) {
+    // Tightened to the specific .partialFailure case: asserting only
+    // `MBrightError.self` would still pass if apply() rethrew the last
+    // per-display error instead of aggregating, which would silently
+    // break the spec-mandated "one failure doesn't abort the others"
+    // contract.
+    do {
         try sut.set(percent: 30, target: .all)
+        Issue.record("Expected MBrightError.partialFailure to be thrown")
+    } catch let error as MBrightError {
+        guard case .partialFailure = error else {
+            Issue.record("Expected .partialFailure, got \(error)")
+            return
+        }
+    } catch {
+        Issue.record("Expected MBrightError, got \(error)")
     }
     // The healthy display must still have been written.
     #expect(backend.values[2] == 0.3)
@@ -121,4 +146,12 @@ private func controller(
 @Test func emptyDisplayListThrows() {
     let (sut, _) = controller(FakeEnumerator([]), FakeBackend())
     #expect(throws: MBrightError.noDisplays) { try sut.get(.main) }
+}
+
+@Test func readingsThrowsOnEmptyDisplayList() {
+    // readings() reached the backend via a different path than
+    // get/set/adjust (all three go through resolve(), which already
+    // guards this) and used to print a blank line and exit 0 instead.
+    let (sut, _) = controller(FakeEnumerator([]), FakeBackend())
+    #expect(throws: MBrightError.noDisplays) { try sut.readings() }
 }

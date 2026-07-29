@@ -34,8 +34,10 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible {
             return "No online displays found"
         case .brightnessUnsupported:
             // Every call site already has the display name in hand (it's how
-            // they got here) and prefixes it themselves, so it isn't repeated here.
-            return "does not support brightness control"
+            // they got here) and prefixes it themselves, so it isn't repeated
+            // here. "The display" keeps this a complete sentence on its own
+            // (e.g. surfaced bare by `get`) without reintroducing the name.
+            return "The display does not support brightness control"
         case let .operationFailed(displayID, code):
             return "Brightness operation failed on display \(displayID) (code \(code))"
         case let .malformedBrightnessValue(displayID, value):

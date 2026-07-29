@@ -21,7 +21,7 @@ struct ListCommand: ParsableCommand {
         }
         guard failures.isEmpty else {
             for failure in failures {
-                FileHandle.standardError.write(Data("\(failure)\n".utf8))
+                FileHandle.standardError.write(Data("Error: \(failure)\n".utf8))
             }
             throw ExitCode.failure
         }

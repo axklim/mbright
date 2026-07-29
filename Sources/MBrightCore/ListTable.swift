@@ -34,7 +34,10 @@ public enum ListTable {
 
     /// Pads `cell` with spaces up to `width + 2`, measuring and padding in
     /// grapheme clusters throughout so multi-code-unit characters (combining
-    /// marks, most emoji) are never truncated.
+    /// marks, most emoji) are never truncated. This counts grapheme
+    /// clusters, not terminal display width, so wide characters (e.g. CJK
+    /// text, some emoji) can still make columns look visually misaligned
+    /// even though nothing is cut off.
     private static func pad(_ cell: String, to width: Int, isLast: Bool) -> String {
         guard !isLast else { return cell }
         let deficit = max(0, width + 2 - cell.count)

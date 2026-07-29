@@ -59,10 +59,10 @@ public final class DisplayServicesBackend: BrightnessBackend, @unchecked Sendabl
         }
         // DisplayServices is private API with no documented contract. A malformed
         // success must become a typed error, never a trap in Percent.fromDevice.
-        guard value.isFinite, (0...1).contains(value) else {
+        guard let validated = DeviceValue.validated(value) else {
             throw MBrightError.malformedBrightnessValue(displayID: id, value: value)
         }
-        return value
+        return validated
     }
 
     public func setBrightness(_ id: CGDirectDisplayID, _ value: Float) throws {

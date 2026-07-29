@@ -13,3 +13,13 @@ public enum Percent {
         min(100, max(0, percent))
     }
 }
+
+/// Validates a raw brightness value read from hardware.
+public enum DeviceValue {
+    /// DisplayServices is private API with no documented contract, so a
+    /// malformed success must become a typed error rather than a trap.
+    public static func validated(_ value: Float) -> Float? {
+        guard value.isFinite, (0...1).contains(value) else { return nil }
+        return value
+    }
+}

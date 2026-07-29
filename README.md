@@ -72,6 +72,21 @@ Error: get does not support --all; use 'mbright list'.
 
 Use `mbright list` if you want brightness for every display at once.
 
+### `up` / `down`
+
+The delta argument to `up` and `down` must be between 0 and 100 inclusive;
+anything outside that range is rejected as a usage error before any display
+is touched:
+
+```
+$ mbright up 500
+Error: Delta must be between 0 and 100.
+```
+
+There is no way to pass a negative delta to flip `up` into a decrease (or
+`down` into an increase) — `mbright up -- -20` is a validation error, not a
+20-point decrease. Use `down` for decreases.
+
 ### Selecting a display: `--display` / `-d`
 
 `--display` accepts, in this exact order of precedence:

@@ -77,8 +77,14 @@ struct UpCommand: ParsableCommand {
 
     @OptionGroup var target: TargetOptions
 
+    func validate() throws {
+        guard (0...100).contains(delta) else {
+            throw ValidationError("Delta must be between 0 and 100.")
+        }
+    }
+
     func run() throws {
-        try makeController().adjust(delta: abs(delta), target: try target.resolvedTarget())
+        try makeController().adjust(delta: delta, target: try target.resolvedTarget())
     }
 }
 
@@ -93,7 +99,13 @@ struct DownCommand: ParsableCommand {
 
     @OptionGroup var target: TargetOptions
 
+    func validate() throws {
+        guard (0...100).contains(delta) else {
+            throw ValidationError("Delta must be between 0 and 100.")
+        }
+    }
+
     func run() throws {
-        try makeController().adjust(delta: -abs(delta), target: try target.resolvedTarget())
+        try makeController().adjust(delta: -delta, target: try target.resolvedTarget())
     }
 }

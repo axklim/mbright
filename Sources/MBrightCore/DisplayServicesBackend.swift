@@ -5,10 +5,10 @@ import CoreGraphics
 ///
 /// This is private API with no public header, so every symbol lookup is
 /// checked and reports exactly what is missing rather than crashing.
-public final class DisplayServicesBackend: BrightnessBackend, @unchecked Sendable {
-    private typealias CanChangeFn = @convention(c) (CGDirectDisplayID) -> Bool
-    private typealias GetFn = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
-    private typealias SetFn = @convention(c) (CGDirectDisplayID, Float) -> Int32
+public final class DisplayServicesBackend: BrightnessBackend, Sendable {
+    private typealias CanChangeFn = @convention(c) @Sendable (CGDirectDisplayID) -> Bool
+    private typealias GetFn = @convention(c) @Sendable (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+    private typealias SetFn = @convention(c) @Sendable (CGDirectDisplayID, Float) -> Int32
 
     public static let frameworkPath =
         "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices"

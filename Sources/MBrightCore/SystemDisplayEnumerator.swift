@@ -3,7 +3,10 @@ import CoreGraphics
 
 /// Online displays from CoreGraphics, with friendly names from AppKit.
 /// `NSScreen.localizedName` works from a plain CLI with no NSApplication;
-/// this was verified on the target machine.
+/// this was verified on the target machine. AppKit expects `NSScreen` to be
+/// accessed from the main thread; `mbright` only ever calls this from the
+/// CLI's single (main) thread, so that expectation is met by construction,
+/// but it has not been verified from a background thread.
 public struct SystemDisplayEnumerator: DisplayEnumerating {
     private static let maxDisplays = 16
 

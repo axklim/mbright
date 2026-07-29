@@ -50,3 +50,13 @@ private let fixtures = [
     #expect(throws: MBrightError.self) { try DisplaySelector.resolve("-1", in: fixtures) }
     #expect(throws: MBrightError.self) { try DisplaySelector.resolve("99999999999", in: fixtures) }
 }
+
+@Test func indexBeatsCollidingDisplayID() throws {
+    let colliding = [
+        DisplayInfo(index: 0, id: 1, name: "First",  vendor: "APP", isMain: true),
+        DisplayInfo(index: 1, id: 0, name: "Second", vendor: "GSM", isMain: false),
+    ]
+    // "1" is index 1 AND display 0's ID. Index must win.
+    #expect(try DisplaySelector.resolve("1", in: colliding).name == "Second")
+    #expect(try DisplaySelector.resolve("0", in: colliding).name == "First")
+}

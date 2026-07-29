@@ -30,7 +30,7 @@ import Testing
 
 @Test func rendersFailedAsError() {
     let output = ListTable.render([
-        DisplayReading(display: ultrafine, state: .failed("Brightness operation failed on '3' (code -1)")),
+        DisplayReading(display: ultrafine, state: .failed("Brightness operation failed on display 3 (code -1)")),
     ])
     #expect(output.contains("ERROR"))
     #expect(!output.contains("-"))

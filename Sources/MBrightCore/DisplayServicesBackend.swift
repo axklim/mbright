@@ -55,12 +55,12 @@ public final class DisplayServicesBackend: BrightnessBackend, @unchecked Sendabl
         var value: Float = -1
         let code = getFn(id, &value)
         guard code == 0 else {
-            throw MBrightError.operationFailed(display: "\(id)", code: code)
+            throw MBrightError.operationFailed(displayID: id, code: code)
         }
         // DisplayServices is private API with no documented contract. A malformed
         // success must become a typed error, never a trap in Percent.fromDevice.
         guard value.isFinite, (0...1).contains(value) else {
-            throw MBrightError.operationFailed(display: "\(id)", code: code)
+            throw MBrightError.malformedBrightnessValue(displayID: id, value: value)
         }
         return value
     }
@@ -68,7 +68,7 @@ public final class DisplayServicesBackend: BrightnessBackend, @unchecked Sendabl
     public func setBrightness(_ id: CGDirectDisplayID, _ value: Float) throws {
         let code = setFn(id, value)
         guard code == 0 else {
-            throw MBrightError.operationFailed(display: "\(id)", code: code)
+            throw MBrightError.operationFailed(displayID: id, code: code)
         }
     }
 }

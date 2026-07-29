@@ -23,12 +23,12 @@ final class FakeBackend: BrightnessBackend, @unchecked Sendable {
     func canChangeBrightness(_ id: CGDirectDisplayID) -> Bool { !unsupported.contains(id) }
 
     func getBrightness(_ id: CGDirectDisplayID) throws -> Float {
-        if failing.contains(id) { throw MBrightError.operationFailed(display: "\(id)", code: -1) }
+        if failing.contains(id) { throw MBrightError.operationFailed(displayID: id, code: -1) }
         return values[id] ?? 0
     }
 
     func setBrightness(_ id: CGDirectDisplayID, _ value: Float) throws {
-        if failing.contains(id) { throw MBrightError.operationFailed(display: "\(id)", code: -1) }
+        if failing.contains(id) { throw MBrightError.operationFailed(displayID: id, code: -1) }
         values[id] = value
         writes.append((id, value))
     }

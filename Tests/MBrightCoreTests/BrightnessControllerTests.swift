@@ -115,7 +115,7 @@ private func controller(
     #expect(readings.count == 3)
     #expect(readings[0].state == .percent(40))
     #expect(readings[1].state == .unsupported)
-    #expect(readings[2].state == .failed("Brightness operation failed on '99' (code -1)"))
+    #expect(readings[2].state == .failed("Brightness operation failed on display 99 (code -1)"))
 }
 
 @Test func emptyDisplayListThrows() {

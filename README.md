@@ -14,10 +14,33 @@ is a GUI. `betterdisplaycli` works but is closed source and needs its app runnin
 
 ## Install
 
-Requires macOS 14+ and the Swift toolchain (Xcode Command Line Tools is enough).
+Requires macOS 14+ and the Swift toolchain (Xcode Command Line Tools is
+enough). There is no prebuilt binary — mbright compiles from source either
+way, which takes about a minute.
+
+### Homebrew
 
 ```bash
-git clone <repo-url> && cd mac-brightness
+brew tap axklim/mbright https://github.com/axklim/mbright
+brew install axklim/mbright/mbright
+```
+
+The tap URL is required because the formula lives in this repository rather
+than in a separate `homebrew-tap` repo. Homebrew 6 also requires third-party
+taps to be trusted before it will load them; if the install is refused with
+`Refusing to load formula ... from untrusted tap`, run
+
+```bash
+brew trust --formula axklim/mbright/mbright
+```
+
+and try again. `brew install --HEAD axklim/mbright/mbright` builds current
+`main` instead of the latest release.
+
+### From source
+
+```bash
+git clone https://github.com/axklim/mbright.git && cd mbright
 swift build -c release
 cp .build/release/mbright /usr/local/bin/
 ```
@@ -122,6 +145,35 @@ Swift Testing ships with Command Line Tools but is not on SwiftPM's default
 search path, so `scripts/test.sh` supplies the framework and rpath flags. Bare
 `swift test` fails with `no such module 'Testing'`. XCTest is unavailable
 without full Xcode.
+
+### Releasing
+
+Homebrew pins each release to a tag's tarball and that tarball's checksum, so
+a release is a tag plus a formula bump, in this order:
+
+1. Bump `version:` in `Sources/mbright/MBright.swift` and commit.
+2. Tag and push:
+
+   ```bash
+   git tag -a v0.2.0 -m "mbright 0.2.0" && git push origin v0.2.0
+   ```
+
+3. Read the checksum of the tarball GitHub generates for the tag:
+
+   ```bash
+   curl -sL https://github.com/axklim/mbright/archive/refs/tags/v0.2.0.tar.gz | shasum -a 256
+   ```
+
+4. Put the new `url` and `sha256` into `Formula/mbright.rb` and push to
+   `main`. Users pick it up with `brew update && brew upgrade`.
+
+Never move a published tag. Homebrew caches downloads by checksum, so a moved
+tag makes every other machine fail with a checksum mismatch.
+
+The formula deliberately omits `depends_on xcode:`. Homebrew's Xcode
+requirement is satisfied only by a full Xcode.app, and this package builds
+with the Command Line Tools alone — adding that line would cost users a
+multi-gigabyte install for nothing.
 
 ## Caveats
 

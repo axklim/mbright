@@ -2,7 +2,7 @@ class Mbright < Formula
   desc "Brightness control for macOS displays that ignore DDC/CI"
   homepage "https://github.com/axklim/mbright"
   url "https://github.com/axklim/mbright/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "PLACEHOLDER_FILLED_IN_AFTER_THE_TAG_IS_PUSHED"
+  sha256 "5886f257a79592194ac47f03ce28c446f300682a293e6de0ce6fb19cb474ba29"
   license "MIT"
   head "https://github.com/axklim/mbright.git", branch: "main"
 

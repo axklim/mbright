@@ -22,20 +22,9 @@ way, which takes about a minute.
 
 ```bash
 brew tap axklim/mbright https://github.com/axklim/mbright
+brew trust --formula axklim/mbright/mbright
 brew install axklim/mbright/mbright
 ```
-
-The tap URL is required because the formula lives in this repository rather
-than in a separate `homebrew-tap` repo. Homebrew 6 also requires third-party
-taps to be trusted before it will load them; if the install is refused with
-`Refusing to load formula ... from untrusted tap`, run
-
-```bash
-brew trust --formula axklim/mbright/mbright
-```
-
-and try again. `brew install --HEAD axklim/mbright/mbright` builds current
-`main` instead of the latest release.
 
 ### From source
 

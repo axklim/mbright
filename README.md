@@ -52,4 +52,14 @@ Full reference: [docs/cli.md](docs/cli.md). How it fits together:
 ./scripts/test.sh             # not bare `swift test`; see docs/architecture.md
 ```
 
+`make` on its own lists every target and the paths it resolves. It builds
+into `$XDG_CACHE_HOME/mbright/build` and installs all three binaries into one
+directory; bare `swift build` still uses `./.build`.
+
+```bash
+make                              # list targets
+make test FILTER=Percent          # one suite
+make install PREFIX=$HOME/.local  # release build, then copy all three
+```
+
 Releasing: [docs/releasing.md](docs/releasing.md). License: MIT.

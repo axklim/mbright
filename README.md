@@ -58,6 +58,7 @@ directory; bare `swift build` still uses `./.build`.
 
 ```bash
 make                              # list targets
+make run                          # rebuild, then restart the menu bar app
 make test FILTER=Percent          # one suite
 make install PREFIX=$HOME/.local  # release build, then copy all three
 ```

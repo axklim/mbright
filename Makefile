@@ -39,14 +39,13 @@ SWIFT_FLAGS := --scratch-path "$(BUILD_DIR)"
 TEST_ARGS   := $(if $(FILTER),--filter $(FILTER),)
 
 .DEFAULT_GOAL := help
-.PHONY: help build build-release run run-menubar test clean install uninstall
+.PHONY: help build build-release run test clean install uninstall
 
 help: ## Show this help
 	@printf 'Targets:\n'
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 	@printf '\nVariables:\n'
-	@printf '  %-16s %s\n' 'ARGS' 'arguments for run (make run ARGS="get -d studio")'
 	@printf '  %-16s %s\n' 'FILTER' 'run only matching tests (make test FILTER=Percent)'
 	@printf '  %-16s %s\n' 'PREFIX' 'install prefix; overrides XDG_BIN_HOME'
 	@printf '  %-16s %s\n' '' 'binaries go to $(BINDIR)'
@@ -56,7 +55,6 @@ help: ## Show this help
 	@printf '  %-16s %s\n' 'XDG_STATE_HOME'  '$(XDG_STATE_HOME)'
 	@printf '  %-16s %s\n' 'XDG_CACHE_HOME'  '$(XDG_CACHE_HOME)   <- build products'
 	@printf '  %-16s %s\n' 'XDG_RUNTIME_DIR' '$(if $(XDG_RUNTIME_DIR),$(XDG_RUNTIME_DIR),(unset; no default))'
-	@printf '\nmake exits 2 on failure; run a binary directly to assert its exit code.\n'
 
 build: ## Debug build
 	swift build $(SWIFT_FLAGS)
@@ -64,16 +62,24 @@ build: ## Debug build
 build-release: ## Optimized build of all three binaries
 	swift build -c release $(SWIFT_FLAGS)
 
-# The debug directory holds all three binaries, so `mbright daemon start` from
-# here finds the debug mbrightd as a sibling rather than an installed one.
-# Starting it is left to you: the daemon never starts unasked.
+# Foreground, Ctrl-C to stop. The app starts mbrightd itself, and the debug
+# directory holds all three binaries, so it spawns the debug daemon as a
+# sibling rather than an installed one.
 #
-# make exits 2 on any recipe failure, so it masks the CLI's own exit code
-# (`get --all` exits 64, make reports 2). Run the binary directly to assert one.
-run: build ## Run the CLI from the debug build (ARGS="list")
-	@"$(BUILD_DIR)/debug/mbright" $(ARGS)
-
-run-menubar: build ## Run the menu bar app in the foreground
+# Anything already running is stopped first. The daemon never exits unasked,
+# so without this a rebuilt app would talk to a daemon still serving the
+# previous build. The app goes first: it would otherwise restart the daemon
+# we are about to stop. `daemon stop` is the graceful route and stops whoever
+# owns the socket; the pkill after it is scoped to this build's own path, so
+# it clears a wedged debug daemon without touching an installed one.
+run: build ## Stop anything running, then run the menu bar app fresh
+	@pkill -x mbright-menubar 2>/dev/null || true
+	@"$(BUILD_DIR)/debug/mbright" daemon stop >/dev/null 2>&1 || true
+	@pkill -f "^$(BUILD_DIR)/debug/mbrightd" 2>/dev/null || true
+	@n=0; while pgrep -x mbright-menubar >/dev/null 2>&1 \
+	    || pgrep -f "^$(BUILD_DIR)/debug/mbrightd" >/dev/null 2>&1; do \
+	  [ $$n -ge 50 ] && break; sleep 0.1; n=$$((n + 1)); \
+	done
 	@"$(BUILD_DIR)/debug/mbright-menubar"
 
 test: ## Run the test suite

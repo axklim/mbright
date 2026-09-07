@@ -13,10 +13,13 @@ public protocol BrightnessBackend: Sendable {
 }
 
 /// Which displays a command applies to.
-public enum Target: Equatable, Sendable {
+public enum Target: Equatable, Sendable, Codable {
     case main
     case all
     case selector(String)
+    /// Exactly one display by `CGDirectDisplayID`. Used by clients that
+    /// already hold an ID (the menu bar app); the CLI never produces it.
+    case id(CGDirectDisplayID)
 }
 
 extension Target {
@@ -30,7 +33,7 @@ extension Target {
 }
 
 /// Brightness as reported for one display.
-public enum BrightnessState: Equatable, Sendable {
+public enum BrightnessState: Equatable, Sendable, Codable {
     case percent(Int)
     /// The display reports no brightness control.
     case unsupported
@@ -39,7 +42,7 @@ public enum BrightnessState: Equatable, Sendable {
 }
 
 /// A display paired with its current brightness state.
-public struct DisplayReading: Equatable, Sendable {
+public struct DisplayReading: Equatable, Sendable, Codable {
     public let display: DisplayInfo
     public let state: BrightnessState
 

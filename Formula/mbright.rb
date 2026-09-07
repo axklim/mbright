@@ -9,8 +9,10 @@ class Mbright < Formula
   depends_on macos: :sonoma
 
   def install
-    system "swift", "build", "--disable-sandbox", "-c", "release", "--product", "mbright"
-    bin.install ".build/release/mbright"
+    system "swift", "build", "--disable-sandbox", "-c", "release"
+    # The CLI and menu bar app look for mbrightd next to their own binary,
+    # so all three must land in the same directory.
+    bin.install ".build/release/mbright", ".build/release/mbrightd", ".build/release/mbright-menubar"
   end
 
   test do
@@ -20,5 +22,7 @@ class Mbright < Formula
     # `get` rejects --all as a usage error (exit 64).
     output = shell_output("#{bin}/mbright get --all 2>&1", 64)
     assert_match "get does not support --all", output
+
+    assert_match version.to_s, shell_output("#{bin}/mbrightd --version")
   end
 end

@@ -1,0 +1,47 @@
+# mbright
+
+macOS display brightness tool: `mbright` CLI, `mbrightd` daemon,
+`mbright-menubar` app. Read `docs/architecture.md` before changing how the
+pieces talk to each other.
+
+## Build and test
+
+- `swift build`; `./scripts/test.sh` for tests. Never bare `swift test`:
+  Swift Testing is not on SwiftPM's search path with Command Line Tools, and
+  XCTest is unavailable. Tests need no hardware.
+- The project must keep building with Command Line Tools only, no Xcode.
+  That is why there is no `.app` bundle and no `SMAppService`.
+- Version lives in `Sources/MBrightCore/Version.swift`. Release steps:
+  `docs/releasing.md`.
+
+## Rules
+
+- `DisplayServices` is private API. Every symbol goes through `dlsym` with a
+  checked result: required symbols fail at startup naming the symbol,
+  optional ones degrade. Validate every value read from it.
+- Only `mbrightd` may touch the displays. Clients speak the typed protocol in
+  `MBrightIPC`; add a `Request`/`Response`/`Event` case rather than a side
+  channel.
+- Paths follow XDG Base Directory. `XDG_RUNTIME_DIR` is the only knob for
+  the socket; do not add env or flag overrides. LaunchAgent plists are the
+  one exception (launchd reads only `~/Library/LaunchAgents`).
+- The daemon never starts or exits unasked. Keep it that way.
+- Errors cross the wire as `MBrightError`; the CLI must print the same
+  messages and exit codes it did in-process.
+
+## Verifying on hardware
+
+The dev machine has a Studio Display (main) and an LG UltraFine. Use a
+scratch `XDG_RUNTIME_DIR=/tmp/<name>` so a test daemon never collides with
+a real one, and `pkill -TERM -f mbrightd` afterwards. Use the LG for value
+assertions: the Studio Display has auto-brightness on and its reading
+drifts by itself. Restore brightness when done.
+
+`screencapture -x` and System Events scripting work from a terminal here;
+a bare executable's status item is `menu bar item 1 of menu bar 1`.
+
+## Docs
+
+Design specs go in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
+with DOT diagrams. User-facing docs: `README.md` (minimal), `docs/cli.md`,
+`docs/architecture.md`, `docs/releasing.md`.

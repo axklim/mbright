@@ -56,6 +56,7 @@ enum UnixSocket {
         var address = try makeAddress(path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw SocketError.posix(operation: "socket", code: errno) }
+        suppressSIGPIPE(fd)
 
         let connected = withUnsafePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -101,6 +102,23 @@ enum UnixSocket {
             }
             return Data(buffer[0..<count])
         }
+    }
+
+    /// Turns a broken pipe into an `EPIPE` the caller can handle. Without
+    /// it, writing to a peer that went away raises SIGPIPE, whose default
+    /// action kills the process.
+    static func suppressSIGPIPE(_ fd: Int32) {
+        var on: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+    }
+
+    /// Marks a descriptor non-blocking. `MSG_DONTWAIT` is not honoured for
+    /// AF_UNIX stream sockets on Darwin, so this is the only way a write
+    /// can refuse instead of waiting.
+    static func setNonBlocking(_ fd: Int32) {
+        let flags = fcntl(fd, F_GETFL, 0)
+        guard flags >= 0 else { return }
+        _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
     }
 
     static func setReceiveTimeout(_ fd: Int32, seconds: Int) {

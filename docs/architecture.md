@@ -68,6 +68,12 @@ Event         = displaysChanged | brightnessChanged(id, percent)
 `Target` has a `.id(CGDirectDisplayID)` case for clients that already hold
 an ID; the CLI never produces it.
 
+Accepted connections are non-blocking. A client that stops draining its
+socket is dropped once a write would block, rather than stranding the main
+queue every other client is served on; long-lived clients reconnect on
+their next request. Both ends set `SO_NOSIGPIPE`, so a peer that goes away
+is an error to handle, not a signal that kills the process.
+
 ## Notifications
 
 Hotplug: `CGDisplayRegisterReconfigurationCallback`, coalesced over 300 ms

@@ -47,3 +47,21 @@ func temporarySocketPath() -> String {
     return ((NSTemporaryDirectory() as NSString).appendingPathComponent(directory) as NSString)
         .appendingPathComponent("mbrightd.sock")
 }
+
+/// Runs a real `LineServer` on a private queue against a temporary socket.
+final class Harness: @unchecked Sendable {
+    let path = temporarySocketPath()
+    let queue = DispatchQueue(label: "mbright.test.server")
+    let server: LineServer
+
+    init(handler: @escaping LineServer.Handler = { makeHandler().handle($0) }) throws {
+        server = LineServer(path: path, queue: queue, handler: handler)
+        try server.start()
+    }
+
+    var connectionCount: Int { queue.sync { server.connectionCount } }
+
+    deinit {
+        queue.sync { server.stop() }
+    }
+}

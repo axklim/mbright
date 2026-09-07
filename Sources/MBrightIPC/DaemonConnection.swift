@@ -15,6 +15,12 @@ public final class DaemonConnection {
     private var nextID = 1
     private var pending: [Int: Completion] = [:]
     private var subscribed = false
+    /// Sends made while a connect is in flight wait here rather than each
+    /// starting a connect of their own. A second socket would stay
+    /// subscribed on the daemon with nobody reading it, and the daemon
+    /// blocks once its receive buffer fills with broadcasts.
+    private var waitingForConnect: [@MainActor (MBrightError?) -> Void] = []
+    private var isConnecting = false
 
     public var onEvent: (@MainActor (Event) -> Void)?
     public var onDisconnect: (@MainActor (String) -> Void)?
@@ -47,10 +53,11 @@ public final class DaemonConnection {
         }
     }
 
-    /// Asks for events. Re-sent automatically after every reconnect.
+    /// Asks for events. The request itself is sent by the connect path, so
+    /// it is re-sent automatically after every reconnect.
     public func subscribe() {
         subscribed = true
-        send(.subscribe) { _ in }
+        ensureConnected { _ in }
     }
 
     // MARK: - Internals
@@ -60,8 +67,11 @@ public final class DaemonConnection {
             then(nil)
             return
         }
+        waitingForConnect.append(then)
+        guard !isConnecting else { return }
+        isConnecting = true
+
         let path = path
-        let wantsSubscription = subscribed
         // Spawning and the connect-retry loop block for up to a few seconds;
         // that must not freeze the UI.
         Task.detached {
@@ -74,21 +84,28 @@ public final class DaemonConnection {
                 result = .failure(.daemonUnavailable(reason: "\(error)"))
             }
             await MainActor.run {
+                self.isConnecting = false
                 switch result {
                 case let .success(fd):
                     self.attach(fd)
-                    if wantsSubscription {
+                    if self.subscribed {
                         let id = self.nextID
                         self.nextID += 1
                         self.pending[id] = { _ in }
                         try? UnixSocket.writeAll(fd, try LineCodec.encode(ClientMessage(id: id, request: .subscribe)))
                     }
-                    then(nil)
+                    self.resumeWaiters(nil)
                 case let .failure(error):
-                    then(error)
+                    self.resumeWaiters(error)
                 }
             }
         }
+    }
+
+    private func resumeWaiters(_ error: MBrightError?) {
+        let waiters = waitingForConnect
+        waitingForConnect = []
+        for waiter in waiters { waiter(error) }
     }
 
     private func attach(_ fd: Int32) {

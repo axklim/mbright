@@ -67,6 +67,8 @@ public final class LineServer: @unchecked Sendable {
     private func acceptPending(on listenFD: Int32) {
         let fd = accept(listenFD, nil, nil)
         guard fd >= 0 else { return }
+        UnixSocket.suppressSIGPIPE(fd)
+        UnixSocket.setNonBlocking(fd)
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
         let connection = Connection(fd: fd, source: source)
         source.setEventHandler { [weak self] in self?.readPending(from: connection) }
@@ -79,7 +81,18 @@ public final class LineServer: @unchecked Sendable {
     }
 
     private func readPending(from connection: Connection) {
-        guard let data = try? UnixSocket.read(connection.fd), !data.isEmpty else {
+        let data: Data
+        do {
+            data = try UnixSocket.read(connection.fd)
+        } catch let SocketError.posix(_, code) where code == EAGAIN {
+            // The socket is non-blocking, so a wake-up with nothing left to
+            // read is normal and says nothing about the connection.
+            return
+        } catch {
+            drop(connection)
+            return
+        }
+        guard !data.isEmpty else {
             drop(connection)
             return
         }
@@ -104,6 +117,10 @@ public final class LineServer: @unchecked Sendable {
         }
     }
 
+    /// Connections are non-blocking, so a peer that stopped reading fails
+    /// this write with `EAGAIN` instead of stranding the queue every other
+    /// client is served on. Such a client is gone, whatever its socket
+    /// still says; dropping it lets it reconnect.
     private func send(_ data: Data, to connection: Connection) {
         do {
             try UnixSocket.writeAll(connection.fd, data)

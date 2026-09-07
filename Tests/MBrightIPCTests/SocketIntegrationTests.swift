@@ -3,22 +3,6 @@ import Testing
 @testable import MBrightCore
 @testable import MBrightIPC
 
-/// Runs a real `LineServer` on a private queue against a temporary socket.
-private final class Harness: @unchecked Sendable {
-    let path = temporarySocketPath()
-    let queue = DispatchQueue(label: "mbright.test.server")
-    let server: LineServer
-
-    init(handler: @escaping LineServer.Handler = { makeHandler().handle($0) }) throws {
-        server = LineServer(path: path, queue: queue, handler: handler)
-        try server.start()
-    }
-
-    deinit {
-        queue.sync { server.stop() }
-    }
-}
-
 @Test func clientGetsRepliesMatchedById() throws {
     let harness = try Harness()
     let client = try BlockingClient(path: harness.path)

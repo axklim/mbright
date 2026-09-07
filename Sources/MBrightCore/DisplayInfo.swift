@@ -1,7 +1,7 @@
 import CoreGraphics
 
 /// One online display, as presented to the user.
-public struct DisplayInfo: Equatable, Sendable {
+public struct DisplayInfo: Equatable, Sendable, Codable {
     /// Position in `list` output. Not stable across replugs.
     public let index: Int
     public let id: CGDirectDisplayID

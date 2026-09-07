@@ -2,7 +2,7 @@ import CoreGraphics
 
 /// Orchestrates display resolution, unit conversion, and clamping.
 /// Hardware access is entirely behind `DisplayEnumerating` and `BrightnessBackend`.
-public struct BrightnessController {
+public struct BrightnessController: Sendable {
     private let enumerator: DisplayEnumerating
     private let backend: BrightnessBackend
 
@@ -67,6 +67,11 @@ public struct BrightnessController {
             return [displays.first(where: \.isMain) ?? displays[0]]
         case let .selector(selector):
             return [try DisplaySelector.resolve(selector, in: displays)]
+        case let .id(id):
+            guard let display = displays.first(where: { $0.id == id }) else {
+                throw MBrightError.noMatch(selector: "\(id)", available: displays.map(\.name))
+            }
+            return [display]
         }
     }
 

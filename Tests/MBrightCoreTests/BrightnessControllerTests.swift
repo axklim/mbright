@@ -155,3 +155,19 @@ private func controller(
     let (sut, _) = controller(FakeEnumerator([]), FakeBackend())
     #expect(throws: MBrightError.noDisplays) { try sut.readings() }
 }
+
+@Test func idTargetSelectsExactlyThatDisplay() throws {
+    // ID 2 is ultrafine; index 2 does not exist. Unlike a numeric selector,
+    // `.id` never tries an index first.
+    let backend = FakeBackend(values: [3: 0.37, 2: 0.49])
+    let (sut, _) = controller(FakeEnumerator(), backend)
+    #expect(try sut.get(.id(2)) == 49)
+    #expect(try sut.get(.id(3)) == 37)
+}
+
+@Test func idTargetWithNoSuchDisplayListsAvailableNames() {
+    let (sut, _) = controller()
+    #expect(throws: MBrightError.noMatch(selector: "99", available: ["Studio Display", "LG UltraFine"])) {
+        try sut.get(.id(99))
+    }
+}

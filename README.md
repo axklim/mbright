@@ -1,10 +1,19 @@
 # mbright
 
-Open-source brightness control for macOS displays, from the command line.
+Open-source brightness control for macOS displays, from the command line and
+the menu bar.
 
 Works with displays that ignore DDC/CI — including the Apple Studio Display and
-LG UltraFine — by going through Apple's own `DisplayServices` layer. No
-background app, no root, no permission prompts.
+LG UltraFine — by going through Apple's own `DisplayServices` layer. No root,
+no permission prompts.
+
+Three binaries ship together:
+
+- `mbright` — the CLI.
+- `mbright-menubar` — a menu bar app with one slider per display.
+- `mbrightd` — the daemon both of them talk to. It is the only process that
+  touches the displays. You start it deliberately, with `mbright daemon start`,
+  the menu bar app, or `--daemon-autostart`, and it runs until you stop it.
 
 ## Why
 
@@ -31,8 +40,11 @@ brew install axklim/mbright/mbright
 ```bash
 git clone https://github.com/axklim/mbright.git && cd mbright
 swift build -c release
-cp .build/release/mbright /usr/local/bin/
+cp .build/release/mbright .build/release/mbrightd .build/release/mbright-menubar /usr/local/bin/
 ```
+
+All three binaries must end up in the same directory: the CLI and the menu
+bar app look for `mbrightd` next to themselves before falling back to `PATH`.
 
 ## Usage
 
@@ -48,56 +60,57 @@ mbright down 10 --all         # relative, clamped at 0
 
 `list` is the default subcommand, so bare `mbright` is the same as `mbright list`.
 
-### `list`
+### Menu bar app
 
-```
-$ mbright list
-INDEX  NAME            VENDOR  ID  BRIGHTNESS
-0*     Studio Display  APP     3   49%
-1      LG UltraFine    GSM     2   49%
+```bash
+mbright-menubar &
 ```
 
-`*` after the index marks the main display. Both `INDEX` (0, 1, ...) and `ID`
-(the display's `CGDirectDisplayID`) are valid values for `--display`.
+Puts a sun icon in the menu bar. The menu lists every connected display with
+a slider; dragging a slider sets that display's brightness immediately.
+Displays that appear or disappear while the app runs show up in the menu
+without a restart. Displays without brightness control are listed with no
+slider.
 
-The BRIGHTNESS column has three states:
+Brightness changed elsewhere, by the CLI, System Settings, a keyboard key, or
+the display's own auto-brightness, shows up in the open menu within a moment:
+the daemon subscribes to the system's brightness change notifications and
+pushes them to the app.
 
-- `37%` — a normal reading.
-- `-` — the display reports no brightness control at all. This is a normal
-  condition (e.g. an unsupported monitor) and `list` still exits 0.
-- `ERROR` — the display claims to support brightness control, but reading it
-  failed. When any display shows `ERROR`, `list` prints the failure details to
-  stderr and exits non-zero, so a partial failure can never look like a clean
-  run.
+**Settings…** has one option, *Launch at login*, which writes
+`~/Library/LaunchAgents/com.axklim.mbright.menubar.plist`. It takes effect at
+the next login and is removed again by unchecking the box. If
+`XDG_RUNTIME_DIR` is set when you enable it, that value is written into the
+plist, because launchd does not pass your shell environment to the app;
+change the variable later and you need to re-enable the checkbox. **Quit** stops the
+menu bar app only; `mbrightd` keeps running until `mbright daemon stop`.
 
-### `get`
+### The daemon
 
-`get` reports exactly one display by design, so its bare-integer output
-composes cleanly in scripts (`brightness=$(mbright get -d studio)`). Because
-of that, `get --all` is rejected as a usage error rather than printing
-multiple numbers a script would have to parse apart:
+`mbrightd` listens on a Unix socket at `$XDG_RUNTIME_DIR/mbright/mbrightd.sock`,
+per the XDG Base Directory specification. macOS does not set
+`XDG_RUNTIME_DIR`, so by default that resolves to the per-user temp directory
+launchd provides (`/var/folders/.../T/mbright/`). Set `XDG_RUNTIME_DIR` to
+move it; the clients pass their environment on to the daemon they spawn.
 
+The daemon never starts or stops on its own. The CLI needs one running:
+
+```bash
+mbright daemon start          # start in the background; no-op if running
+mbright daemon status         # exit 0 if running, 1 if not
+mbright daemon stop           # ask it to exit; removes the socket
+mbright list                  # error if no daemon is running
+mbright list --daemon-autostart   # start one first if needed
 ```
-$ mbright get --all
-Error: get does not support --all; use 'mbright list'.
-```
 
-Use `mbright list` if you want brightness for every display at once.
+Every CLI command accepts `--daemon-autostart`. Without it, a missing daemon
+is an error that names both ways to start one. The menu bar app always
+starts the daemon if none is running, since launching the app is itself the
+request for one.
 
-### `up` / `down`
-
-The delta argument to `up` and `down` must be between 0 and 100 inclusive;
-anything outside that range is rejected as a usage error before any display
-is touched:
-
-```
-$ mbright up 500
-Error: Delta must be between 0 and 100.
-```
-
-There is no way to pass a negative delta to flip `up` into a decrease (or
-`down` into an increase) — `mbright up -- -20` is a validation error, not a
-20-point decrease. Use `down` for decreases.
+`mbrightd` runs in the foreground until SIGTERM or `mbright daemon stop`.
+Starting a second copy on the same socket fails with an error instead of
+evicting the first one.
 
 ### Selecting a display: `--display` / `-d`
 
@@ -128,7 +141,22 @@ names are stable, **scripts should prefer name substrings** (`-d studio`,
 ./scripts/test.sh             # NOT bare `swift test` — see below
 ```
 
-48 tests, none requiring hardware. Most are pure-function tests; the controller tests run against a fake `BrightnessBackend`.
+76 tests, none requiring hardware. Most are pure-function tests; the
+controller and daemon request-handler tests run against a fake
+`BrightnessBackend`, and the socket tests run a real `mbrightd` server loop
+in-process against a temporary socket.
+
+Package layout:
+
+| Target | What it is |
+| --- | --- |
+| `MBrightCore` | Display enumeration, `DisplayServices` backend, brightness logic |
+| `MBrightIPC` | Wire messages, JSON-lines codec, Unix socket server and clients |
+| `MBrightMenuBar` | Status item, sliders, settings window, launch agent |
+| `mbright`, `mbrightd`, `mbright-menubar` | The three executables |
+
+The design, including the architecture diagram, is in
+`docs/superpowers/specs/2026-09-06-menu-bar-app-design.md`.
 
 Swift Testing ships with Command Line Tools but is not on SwiftPM's default
 search path, so `scripts/test.sh` supplies the framework and rpath flags. Bare
@@ -140,7 +168,7 @@ without full Xcode.
 Homebrew pins each release to a tag's tarball and that tarball's checksum, so
 a release is a tag plus a formula bump, in this order:
 
-1. Bump `version:` in `Sources/mbright/MBright.swift` and commit.
+1. Bump `Version.current` in `Sources/MBrightCore/Version.swift` and commit.
 2. Tag and push:
 
    ```bash
@@ -170,6 +198,10 @@ multi-gigabyte install for nothing.
 change or remove it in any macOS release. If a required symbol disappears,
 mbright fails at startup with a message naming the exact missing symbol,
 rather than crashing or silently doing nothing.
+
+`mbright-menubar` is a bare executable, not an `.app` bundle, so it has no
+icon in the Dock or in System Settings and cannot use the modern login-item
+API; Launch at login is a LaunchAgent plist instead.
 
 mbright has only ever been run against one configuration: an Apple Studio
 Display and an LG UltraFine, both connected to Apple Silicon. It has not been

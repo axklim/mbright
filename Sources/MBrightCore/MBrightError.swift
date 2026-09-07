@@ -1,6 +1,6 @@
 import CoreGraphics
 
-public enum MBrightError: Error, Equatable, CustomStringConvertible {
+public enum MBrightError: Error, Equatable, CustomStringConvertible, Codable {
     case frameworkUnavailable(path: String, reason: String)
     case symbolUnavailable(name: String, osVersion: String)
     case enumerationFailed(code: Int32)
@@ -18,6 +18,14 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible {
     case partialFailure(failures: [String])
     case getDoesNotSupportAll
     case conflictingTargetFlags
+    /// A client could not reach `mbrightd` (not running and could not be
+    /// started, or the connection dropped mid-request).
+    case daemonUnavailable(reason: String)
+    /// No daemon is listening and the caller chose not to start one.
+    case daemonNotRunning
+    /// The daemon hit an error that is not an `MBrightError`. Carries the
+    /// description so the client can show it verbatim.
+    case daemonFailure(String)
 
     public var description: String {
         switch self {
@@ -52,6 +60,12 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible {
             return "get reports a single display; use 'mbright list' for all displays"
         case .conflictingTargetFlags:
             return "--display and --all are mutually exclusive."
+        case let .daemonUnavailable(reason):
+            return "Could not reach mbrightd: \(reason)"
+        case .daemonNotRunning:
+            return "mbrightd is not running. Start it with 'mbright daemon start' or pass --daemon-autostart."
+        case let .daemonFailure(message):
+            return "mbrightd failed: \(message)"
         }
     }
 }

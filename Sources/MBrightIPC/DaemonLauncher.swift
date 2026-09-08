@@ -39,7 +39,7 @@ public enum DaemonLauncher {
     }
 
     /// The daemon next to the calling executable wins over one on PATH so a
-    /// from-source build never silently talks to a Homebrew install.
+    /// from-source build never silently talks to the installed one.
     public static func locateDaemon(
         executableURL: URL? = Bundle.main.executableURL,
         environment: [String: String] = ProcessInfo.processInfo.environment

@@ -1,6 +1,5 @@
 # The CLI and the menu bar app look for mbrightd next to their own executable
 # before falling back to PATH, so all three must be installed side by side.
-# Formula/mbright.rb does the same thing for the Homebrew path.
 BINARIES := mbright mbrightd mbright-menubar
 
 # XDG Base Directory Specification v0.8.
@@ -19,9 +18,16 @@ XDG_CACHE_HOME  := $(call xdg,$(XDG_CACHE_HOME),$(HOME)/.cache)
 XDG_RUNTIME_DIR := $(call xdg,$(XDG_RUNTIME_DIR),)
 
 # Of the five, only XDG_CACHE_HOME is read by a target: build products are
-# regenerable, so they belong in the cache. Bare `swift build` and the Homebrew
-# formula do not go through make and still use ./.build.
+# regenerable, so they belong in the cache. Bare `swift build` does not go
+# through make and still uses ./.build.
 BUILD_DIR := $(XDG_CACHE_HOME)/mbright/build
+
+# The install is an app bundle so Spotlight, Raycast and the Dock can launch
+# the menu bar app. It is a plain directory with an Info.plist, no Xcode
+# involved. All three binaries live inside it; the CLI is reached through a
+# symlink in BINDIR, and the sibling-daemon lookup resolves symlinks.
+APP     := $(HOME)/Applications/mbright.app
+APP_BIN := $(APP)/Contents/MacOS
 
 # An explicit PREFIX wins. Otherwise fall back to XDG_BIN_HOME, which is already
 # a bin directory rather than a prefix. No XDG spec defines it, but setups that
@@ -31,9 +37,13 @@ ifneq ($(origin PREFIX),undefined)
 else ifneq ($(XDG_BIN_HOME),)
   BINDIR := $(XDG_BIN_HOME)
 else
-  BINDIR := /usr/local/bin
+  BINDIR := $(HOME)/.local/bin
 endif
 BINDIR := $(call tilde,$(BINDIR))
+
+# Written by the app's Launch at login setting; launchd reads only this path.
+LAUNCH_AGENT_LABEL := com.axklim.mbright.menubar
+LAUNCH_AGENT       := $(HOME)/Library/LaunchAgents/$(LAUNCH_AGENT_LABEL).plist
 
 SWIFT_FLAGS := --scratch-path "$(BUILD_DIR)"
 TEST_ARGS   := $(if $(FILTER),--filter $(FILTER),)
@@ -47,8 +57,9 @@ help: ## Show this help
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 	@printf '\nVariables:\n'
 	@printf '  %-16s %s\n' 'FILTER' 'run only matching tests (make test FILTER=Percent)'
-	@printf '  %-16s %s\n' 'PREFIX' 'install prefix; overrides XDG_BIN_HOME'
-	@printf '  %-16s %s\n' '' 'binaries go to $(BINDIR)'
+	@printf '  %-16s %s\n' 'PREFIX' 'CLI symlink prefix; overrides XDG_BIN_HOME'
+	@printf '  %-16s %s\n' '' 'symlink goes to $(BINDIR)/mbright'
+	@printf '  %-16s %s\n' '' 'app bundle goes to $(APP)'
 	@printf '\nXDG base directories (resolved):\n'
 	@printf '  %-16s %s\n' 'XDG_CONFIG_HOME' '$(XDG_CONFIG_HOME)'
 	@printf '  %-16s %s\n' 'XDG_DATA_HOME'   '$(XDG_DATA_HOME)'
@@ -62,25 +73,33 @@ build: ## Debug build
 build-release: ## Optimized build of all three binaries
 	swift build -c release $(SWIFT_FLAGS)
 
-# Foreground, Ctrl-C to stop. The app starts mbrightd itself, and the debug
-# directory holds all three binaries, so it spawns the debug daemon as a
-# sibling rather than an installed one.
-#
-# Anything already running is stopped first. The daemon never exits unasked,
-# so without this a rebuilt app would talk to a daemon still serving the
-# previous build. The app goes first: it would otherwise restart the daemon
-# we are about to stop. `daemon stop` is the graceful route and stops whoever
-# owns the socket; the pkill after it is scoped to this build's own path, so
-# it clears a wedged debug daemon without touching an installed one.
-run: build ## Stop anything running, then run the menu bar app fresh
-	@pkill -x mbright-menubar 2>/dev/null || true
-	@"$(BUILD_DIR)/debug/mbright" daemon stop >/dev/null 2>&1 || true
-	@pkill -f "^$(BUILD_DIR)/debug/mbrightd" 2>/dev/null || true
-	@n=0; while pgrep -x mbright-menubar >/dev/null 2>&1 \
-	    || pgrep -f "^$(BUILD_DIR)/debug/mbrightd" >/dev/null 2>&1; do \
-	  [ $$n -ge 50 ] && break; sleep 0.1; n=$$((n + 1)); \
-	done
-	@"$(BUILD_DIR)/debug/mbright-menubar"
+# Stops the menu bar app and the daemon. The daemon never exits unasked, so
+# without this a rebuilt or reinstalled app would talk to a daemon still
+# serving the previous build. The app goes first: it would otherwise restart
+# the daemon we are about to stop. `daemon stop` through the CLI in $(1) is
+# the graceful route and stops whoever owns the socket; the pkill after it is
+# scoped to the daemon in $(2), so it clears a wedged daemon of that build
+# without touching a scratch one under another XDG_RUNTIME_DIR.
+define stop
+pkill -x mbright-menubar 2>/dev/null || true; \
+"$(1)/mbright" daemon stop >/dev/null 2>&1 || true; \
+pkill -f "^$(2)/mbrightd" 2>/dev/null || true; \
+n=0; while pgrep -x mbright-menubar >/dev/null 2>&1 \
+    || pgrep -f "^$(2)/mbrightd" >/dev/null 2>&1; do \
+  [ $$n -ge 50 ] && break; sleep 0.1; n=$$((n + 1)); \
+done
+endef
+
+# Foreground, Ctrl-C or Quit to stop. The app starts mbrightd itself, and the
+# debug directory holds all three binaries, so it spawns the debug daemon as
+# a sibling rather than the installed one. Whatever was running is stopped
+# first, and the debug daemon is stopped again afterwards so nothing from
+# this build outlives the test; relaunch the installed app from Spotlight.
+# The trap keeps the shell alive through Ctrl-C long enough to do that.
+run: build ## Stop anything running, run the menu bar app, stop its daemon on exit
+	@$(call stop,$(BUILD_DIR)/debug,$(BUILD_DIR)/debug)
+	@trap ':' INT; "$(BUILD_DIR)/debug/mbright-menubar"; \
+	  "$(BUILD_DIR)/debug/mbright" daemon stop >/dev/null 2>&1 || true
 
 test: ## Run the test suite
 	./scripts/test.sh $(SWIFT_FLAGS) $(TEST_ARGS)
@@ -94,27 +113,33 @@ clean: ## Remove build products (fetched dependencies are kept)
 	swift package clean $(SWIFT_FLAGS)
 	swift package clean
 
-install: build-release ## Build, then install all three into PREFIX/bin
-	@mkdir -p "$(BINDIR)" 2>/dev/null || true
-	@if [ ! -w "$(BINDIR)" ]; then \
-	  echo "make: $(BINDIR) is not writable." >&2; \
-	  echo "      Re-run with sudo, or install elsewhere: make install PREFIX=\$$HOME/.local" >&2; \
-	  exit 1; \
-	fi
+install: build-release ## Build, stop anything running, install the app bundle, launch it
+	@$(call stop,$(BUILD_DIR)/release,$(APP_BIN))
+	@mkdir -p "$(APP_BIN)" "$(BINDIR)"
 	@for b in $(BINARIES); do \
-	  install -m 0755 "$(BUILD_DIR)/release/$$b" "$(BINDIR)/$$b" || exit 1; \
-	  echo "installed $(BINDIR)/$$b"; \
+	  install -m 0755 "$(BUILD_DIR)/release/$$b" "$(APP_BIN)/$$b" || exit 1; \
 	done
+	@sed "s/@VERSION@/$$("$(BUILD_DIR)/release/mbright" --version)/g" \
+	  scripts/Info.plist.in > "$(APP)/Contents/Info.plist"
+	@ln -sfn "$(APP_BIN)/mbright" "$(BINDIR)/mbright"
+	@echo "installed $(APP)"
+	@echo "installed $(BINDIR)/mbright -> $(APP_BIN)/mbright"
+	@open -a "$(APP)"
 
-uninstall: ## Remove all three binaries from PREFIX/bin
-	@for b in $(BINARIES); do \
-	  if [ ! -e "$(BINDIR)/$$b" ]; then \
-	    echo "not installed: $(BINDIR)/$$b"; \
-	  elif [ ! -w "$(BINDIR)" ]; then \
-	    echo "make: $(BINDIR) is not writable, re-run with sudo." >&2; \
-	    exit 1; \
-	  else \
-	    rm -f "$(BINDIR)/$$b"; \
-	    echo "removed $(BINDIR)/$$b"; \
-	  fi; \
-	done
+# Only a symlink that points into the bundle is ours to remove. The
+# LaunchAgent is unloaded best-effort: the app never bootstraps it, so it is
+# only loaded if this login started the app.
+uninstall: ## Stop anything running, remove the app bundle, CLI symlink and LaunchAgent
+	@$(call stop,$(APP_BIN),$(APP_BIN))
+	@launchctl bootout "gui/$$(id -u)/$(LAUNCH_AGENT_LABEL)" >/dev/null 2>&1 || true
+	@if [ -e "$(LAUNCH_AGENT)" ]; then \
+	  rm -f "$(LAUNCH_AGENT)" && echo "removed $(LAUNCH_AGENT)"; \
+	fi
+	@if [ "$$(readlink "$(BINDIR)/mbright")" = "$(APP_BIN)/mbright" ]; then \
+	  rm -f "$(BINDIR)/mbright" && echo "removed $(BINDIR)/mbright"; \
+	fi
+	@if [ -d "$(APP)" ]; then \
+	  rm -r "$(APP)" && echo "removed $(APP)"; \
+	else \
+	  echo "not installed: $(APP)"; \
+	fi

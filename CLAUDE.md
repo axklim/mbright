@@ -10,11 +10,14 @@ pieces talk to each other.
   Swift Testing is not on SwiftPM's search path with Command Line Tools, and
   XCTest is unavailable. Tests need no hardware.
 - `make` wraps both and lists its targets. It builds into
-  `$XDG_CACHE_HOME/mbright/build`, not `./.build`, and `make install` puts all
-  three binaries in one directory because clients look for `mbrightd` next to
-  their own executable. Bare `swift build` and the formula still use `./.build`.
+  `$XDG_CACHE_HOME/mbright/build`, not `./.build`. `make install` puts all
+  three binaries inside `~/Applications/mbright.app` because clients look for
+  `mbrightd` next to their own executable; the CLI is a symlink into it.
+  `make run` stops the installed app and runs the debug build in its place.
+  Bare `swift build` still uses `./.build`.
 - The project must keep building with Command Line Tools only, no Xcode.
-  That is why there is no `.app` bundle and no `SMAppService`.
+  The `.app` is a plain directory `make install` writes from
+  `scripts/Info.plist.in`; there is no Xcode project and no `SMAppService`.
 - Version lives in `Sources/MBrightCore/Version.swift`. Release steps:
   `docs/releasing.md`.
 

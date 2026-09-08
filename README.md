@@ -6,16 +6,19 @@ Apple's own `DisplayServices` layer: no root, no permission prompts.
 
 ## Install
 
-Requires macOS 14+ and the Xcode Command Line Tools. Builds from source
-either way, about a minute.
+Requires macOS 14+ and the Xcode Command Line Tools. Builds from source,
+about a minute.
 
 ```bash
-brew tap axklim/mbright https://github.com/axklim/mbright
-brew trust --formula axklim/mbright/mbright
-brew install axklim/mbright/mbright
+make install     # ~/Applications/mbright.app + ~/.local/bin/mbright
+make uninstall
 ```
 
-Or: `swift build -c release` and copy `mbright`, `mbrightd`, and
+`make install` also launches the menu bar app; afterwards it is in
+Spotlight and Raycast like any app. `~/.local/bin` must be on your `PATH`
+for the CLI (`make install PREFIX=/usr/local` puts the symlink elsewhere).
+
+Without make: `swift build -c release` and copy `mbright`, `mbrightd`, and
 `mbright-menubar` from `.build/release/` into one directory on your `PATH`.
 
 ## Usage
@@ -29,7 +32,7 @@ mbright down 10
 
 mbright daemon start          # the CLI talks to mbrightd; start it once
 mbright daemon stop
-mbright-menubar &             # menu bar app with a slider per display
+open -a mbright               # menu bar app with a slider per display
 ```
 
 The CLI needs `mbrightd` running. Start it once, or pass `--daemon-autostart`
@@ -53,14 +56,17 @@ Full reference: [docs/cli.md](docs/cli.md). How it fits together:
 ```
 
 `make` on its own lists every target and the paths it resolves. It builds
-into `$XDG_CACHE_HOME/mbright/build` and installs all three binaries into one
-directory; bare `swift build` still uses `./.build`.
+into `$XDG_CACHE_HOME/mbright/build`; bare `swift build` still uses
+`./.build`.
 
 ```bash
 make                              # list targets
-make run                          # rebuild, then restart the menu bar app
+make run                          # stop the installed app, run this build
 make test FILTER=Percent          # one suite
-make install PREFIX=$HOME/.local  # release build, then copy all three
 ```
+
+`make run` stops the installed app and daemon and runs the debug build in
+the foreground. Ctrl-C (or Quit) stops it and its daemon; relaunch the
+installed app from Spotlight.
 
 Releasing: [docs/releasing.md](docs/releasing.md). License: MIT.

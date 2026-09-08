@@ -39,16 +39,23 @@ public enum DaemonLauncher {
     }
 
     /// The daemon next to the calling executable wins over one on PATH so a
-    /// from-source build never silently talks to the installed one.
+    /// from-source build never silently talks to the installed one. In the
+    /// installed app it lives in `Contents/Helpers`, not `Contents/MacOS`:
+    /// an executable in `MacOS` counts to LaunchServices as an instance of
+    /// the app, and a daemon that outlives Quit would then be what a
+    /// relaunch activates instead of the menu bar app.
     public static func locateDaemon(
         executableURL: URL? = Bundle.main.executableURL,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> String? {
         var candidates: [String] = []
         if let executableURL {
-            let resolved = executableURL.resolvingSymlinksInPath()
-            candidates.append(executableURL.deletingLastPathComponent().appendingPathComponent(daemonExecutableName).path)
-            candidates.append(resolved.deletingLastPathComponent().appendingPathComponent(daemonExecutableName).path)
+            for url in [executableURL, executableURL.resolvingSymlinksInPath()] {
+                let directory = url.deletingLastPathComponent()
+                candidates.append(directory.appendingPathComponent(daemonExecutableName).path)
+                candidates.append(directory.deletingLastPathComponent()
+                    .appendingPathComponent("Helpers").appendingPathComponent(daemonExecutableName).path)
+            }
         }
         for directory in (environment["PATH"] ?? "").split(separator: ":") {
             candidates.append((String(directory) as NSString).appendingPathComponent(daemonExecutableName))

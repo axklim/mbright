@@ -29,9 +29,15 @@ that names both ways to start one.
 `.prohibited` activation policy: no Dock icon, no UI, but AppKit keeps
 `NSScreen.screens` current across hotplugs and the main run loop services
 the socket. It never starts or exits on its own: `mbright daemon start`,
-the menu bar app, or `--daemon-autostart` start it; `mbright daemon stop`
-or SIGTERM stop it, unlinking the socket on the way out. A second copy on
-the same socket refuses to start.
+the menu bar app, or `--daemon-autostart` start it; `mbright daemon stop`,
+Quit in the menu bar app, or SIGTERM stop it, unlinking the socket on the
+way out. A second copy on
+the same socket refuses to start. Inside the app bundle it lives in
+`Contents/Helpers`: an `NSApplication` running from `Contents/MacOS` is,
+to LaunchServices, an instance of the app, so a daemon running there while
+the app is not (started by the CLI, say) would be what a launch activates
+instead of the menu bar app. Clients look for it next to their own executable first, then in
+`../Helpers`, then on `PATH`.
 
 **`mbright-menubar`** is a view. It never touches displays. It spawns the
 daemon if none is running, subscribes to events, rebuilds its menu on open
@@ -95,7 +101,7 @@ refreshes on every menu open.
 | Socket | `$XDG_RUNTIME_DIR/mbright/mbrightd.sock` |
 | Config (planned, #6) | `$XDG_CONFIG_HOME/mbright/` |
 | LaunchAgent plist | `~/Library/LaunchAgents/com.axklim.mbright.menubar.plist` (launchd reads nowhere else) |
-| Install (`make install`) | `~/Applications/mbright.app` holding all three binaries; `~/.local/bin/mbright` symlinks into it |
+| Install (`make install`) | `~/Applications/mbright.app`: clients in `Contents/MacOS`, `mbrightd` in `Contents/Helpers`; `~/.local/bin/mbright` symlinks into it |
 
 XDG rules: unset or empty means the default; a relative path is ignored.
 There is no other override. macOS never sets `XDG_RUNTIME_DIR`, so the

@@ -107,6 +107,24 @@ import Testing
     #expect(DaemonLauncher.locateDaemon(executableURL: nil, environment: [:]) == nil)
 }
 
+@Test func locateDaemonFindsHelperInsideBundle() throws {
+    let bundle = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("mbright-locate-\(UUID().uuidString)")
+        .appendingPathComponent("mbright.app/Contents")
+    let macOS = bundle.appendingPathComponent("MacOS")
+    let helpers = bundle.appendingPathComponent("Helpers")
+    try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: helpers, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: bundle.deletingLastPathComponent().deletingLastPathComponent()) }
+
+    let helperDaemon = helpers.appendingPathComponent("mbrightd").path
+    FileManager.default.createFile(atPath: helperDaemon, contents: Data("#!/bin/sh\n".utf8),
+                                   attributes: [.posixPermissions: 0o755])
+    let executable = macOS.appendingPathComponent("mbright-menubar")
+
+    #expect(DaemonLauncher.locateDaemon(executableURL: executable, environment: [:]) == helperDaemon)
+}
+
 private final class Counts: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [Int] = []

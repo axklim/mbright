@@ -17,7 +17,9 @@ can start either the menu bar app (which starts the daemon, as today) or
   never edited by hand or by the UI.
 - **One writer.** Only `mbrightd` reads or writes the config file and the
   plist. The CLI and the Settings window change settings through typed
-  requests. No file watching.
+  requests. No file watching: a hand edit is picked up by
+  `mbright config reload` or the next daemon start, and `mbright config
+  init` creates a file to edit.
 - **One plist, one label** (`com.axklim.mbright`). The `ui` key only
   changes which program it starts.
 - **`ui: true` keeps today's direction.** launchd starts the app, the app
@@ -84,30 +86,36 @@ invalidate old files.
 
 ### Protocol
 
-Two new `Request` cases and one `Response` case in `MBrightIPC`:
+Four new `Request` cases and one `Response` case in `MBrightIPC`:
 
 ```swift
-case config                 // -> .config(Config)
-case setConfig(Config)      // -> .config(Config) with the persisted value
+case config                 // read the daemon's current config
+case setConfig(Config)      // persist and apply
+case reloadConfig           // re-read the file, reconcile the plist
+case writeConfig            // create the file from the current config if absent
 ...
-case config(Config)
+case config(ConfigStatus)   // reply to all four
 ```
 
-`RequestHandler` returns `.ok` for both, the way it does for `.subscribe`
-and `.shutdown`; the daemon executable dispatches them to its own handler
-before falling through to `RequestHandler`. The reply to `setConfig` is
-the config as persisted, so clients render what the daemon holds, never
-what they sent.
+`ConfigStatus` (in `MBrightCore`) is `config: Config`, `path: String`,
+`onDisk: Bool`. Every config request replies with the daemon's state
+after the request, so clients render what the daemon holds, never what
+they sent.
 
-One new `MBrightError` case:
+`RequestHandler` returns `.ok` for all four, the way it does for
+`.subscribe` and `.shutdown`; the daemon executable dispatches them to its
+own handler before falling through to `RequestHandler`.
+
+Two new `MBrightError` cases, crossing the wire and exiting non-zero like
+every other `MBrightError`:
 
 ```swift
 case loginUnavailable(reason: String)
+case configInvalid(path: String, reason: String)
 ```
 
-Message: `Launch at login needs mbright installed as an app: <reason>.
-Run 'make install' first.` It crosses the wire and exits non-zero like every
-other `MBrightError`.
+Messages: `Launch at login needs mbright installed as an app: <reason>.
+Run 'make install' first.` and `Could not read <path>: <reason>`.
 
 ### Daemon side: a new `MBrightDaemon` library
 
@@ -122,7 +130,7 @@ display watcher. New units:
 | `LaunchAgent` | Moves here from `MBrightMenuBar`. Label `com.axklim.mbright`. Builds the plist dictionary from a program path and an environment; reads an existing plist back; writes or removes the file. Never bootstraps. | Foundation |
 | `InstalledBundle` | From the daemon's own executable path, derives the app bundle root, the app executable path and the daemon path. Returns `nil` unless the daemon runs from `<name>.app/Contents/Helpers/mbrightd`. | Foundation |
 | `LoginReconciler` | Pure decision: given `Config`, the `InstalledBundle`, the current environment and the plist currently on disk, returns `.write(plist)`, `.remove`, or `.leave`. | `LaunchAgent` |
-| `SettingsHandler` | Holds the in-memory `Config`; handles `.config` and `.setConfig`: validates, saves the file, runs the reconciler, applies the action, replies. | all of the above |
+| `SettingsHandler` | Holds the in-memory `Config`; handles the four config requests: `setConfig` saves then reconciles; `reloadConfig` loads (a malformed file is `configInvalid` and leaves memory untouched) then reconciles with start-time rules; `writeConfig` saves the held config only when no file exists. | all of the above |
 
 ### Reconcile rules
 
@@ -133,14 +141,15 @@ if one is set (the existing `relevantEnvironment` rule).
 
 | Trigger | `login` | Plist on disk | Action |
 | --- | --- | --- | --- |
-| start or setConfig | false | present | remove |
-| start or setConfig | false | absent | leave |
+| any | false | present | remove |
+| any | false | absent | leave |
 | setConfig | true | any | write, env = current environment |
-| start | true | absent | write, env = current environment |
-| start | true | present, same program | leave |
-| start | true | present, different program | write, env = plist's existing env |
+| start or reload | true | absent | write, env = current environment |
+| start or reload | true | present, same program | leave |
+| start or reload | true | present, different program | write, env = plist's existing env |
 
-On start the environment already in the plist wins over the daemon's own.
+`writeConfig` never touches the plist. On start and reload the environment
+already in the plist wins over the daemon's own.
 launchd never inherits the shell, so the pinned value is the one that
 worked at enable time; a daemon started from a terminal with a scratch
 `XDG_RUNTIME_DIR` (the hardware-testing workflow in `CLAUDE.md`) must not
@@ -166,7 +175,24 @@ plist, so a user can always turn it off.
 mbright daemon enable-login [--no-ui]
 mbright daemon disable-login
 mbright daemon status
+mbright config show
+mbright config init
+mbright config reload
 ```
+
+`config show` prints the path, whether the file exists, and the values:
+
+```
+~/.config/mbright/config.json (not written yet)
+login: disabled
+ui: menu bar app
+```
+
+`config init` sends `writeConfig` so a user has a file to edit. It prints
+`wrote <path>` or `<path> already exists`, and never overwrites. `config
+reload` sends `reloadConfig`, so a hand edit takes effect without a daemon
+restart, and prints the same block as `show`. A malformed file fails with
+`configInvalid` and the daemon keeps its previous settings.
 
 `enable-login` sends `setConfig(login: true, ui: !noUI)`; `disable-login`
 sends `setConfig(login: false, ui: <current>)` after a `config` request so
@@ -178,10 +204,10 @@ login: enabled, starts mbrightd only
 login: disabled
 ```
 
-`status` prints that line after the running/not-running line. All three
-respect `--daemon-autostart` as every other command does; without a
-daemon they fail with the usual missing-daemon error, since only the daemon
-can write the config.
+`status` prints that line after the running/not-running line. All config
+commands respect `--daemon-autostart` as every other command does; without
+a daemon they fail with the usual missing-daemon error, since only the
+daemon touches the config.
 
 ### Menu bar app
 
@@ -208,7 +234,7 @@ the daemon wrote. `MBrightMenuBar` no longer depends on the plist at all.
   label; the "Launch at login" paragraph moves ownership to the daemon;
   one-time note: remove `~/Library/LaunchAgents/com.axklim.mbright.menubar.plist`
   by hand and run `mbright daemon enable-login`.
-- `docs/cli.md`: the three subcommands and their output.
+- `docs/cli.md`: the `daemon` and `config` subcommands and their output.
 - `README.md`: one line for `enable-login`.
 - `CLAUDE.md`: the hardware-testing note gains "a scratch daemon never
   rewrites the login plist; a debug build cannot enable login".
@@ -229,7 +255,9 @@ All with fakes and temp directories, no hardware, no real
   environment-precedence rule.
 - `SettingsHandler`: `config` returns held value; `setConfig` saves and
   reconciles; `login: true` outside a bundle returns `loginUnavailable`
-  and writes nothing; `login: false` outside a bundle saves and removes.
+  and writes nothing; `login: false` outside a bundle saves and removes;
+  `reloadConfig` picks up a hand edit, rejects a malformed file without
+  changing state; `writeConfig` creates once and never overwrites.
 - `MBrightIPCTests`: codec round trip for the new cases; `RequestHandler`
   returns `.ok` for them.
 

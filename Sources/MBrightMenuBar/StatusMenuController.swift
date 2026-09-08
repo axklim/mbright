@@ -24,7 +24,7 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
     public init(connection: DaemonConnection) {
         self.connection = connection
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        self.settings = SettingsWindowController()
+        self.settings = SettingsWindowController(connection: connection)
         super.init()
 
         if let button = statusItem.button {

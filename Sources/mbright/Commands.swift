@@ -133,7 +133,7 @@ struct DaemonCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "daemon",
         abstract: "Start, stop, or inspect mbrightd.",
-        subcommands: [DaemonStart.self, DaemonStop.self, DaemonStatus.self]
+        subcommands: [DaemonStart.self, DaemonStop.self, DaemonStatus.self, DaemonEnableLogin.self, DaemonDisableLogin.self]
     )
 }
 
@@ -185,6 +185,7 @@ struct DaemonStatus: ParsableCommand {
             let response = try perform(.version, autostart: false)
             guard case let .version(version) = response else { throw unexpected(response) }
             print("mbrightd \(version) is running on \(path)")
+            print(loginLine(try configStatus(.config, autostart: false).config))
         } catch MBrightError.daemonNotRunning {
             print("mbrightd is not running (socket: \(path))")
             throw ExitCode.failure

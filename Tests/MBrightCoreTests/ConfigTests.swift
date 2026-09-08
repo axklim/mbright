@@ -1,0 +1,34 @@
+import Foundation
+import Testing
+@testable import MBrightCore
+
+@Test func configDefaultsAreLoginOffUIOn() {
+    #expect(Config() == Config(login: false, ui: true))
+}
+
+@Test func configDecodesMissingKeysAsDefaultsAndIgnoresUnknownKeys() throws {
+    let decoder = JSONDecoder()
+    #expect(try decoder.decode(Config.self, from: Data("{}".utf8)) == Config())
+    #expect(try decoder.decode(Config.self, from: Data(#"{"login": true}"#.utf8)) == Config(login: true, ui: true))
+    #expect(try decoder.decode(Config.self, from: Data(#"{"login": true, "ui": false, "future": 1}"#.utf8))
+        == Config(login: true, ui: false))
+}
+
+@Test func configEncodesBothKeys() throws {
+    let data = try JSONEncoder().encode(Config(login: true, ui: false))
+    let object = try JSONSerialization.jsonObject(with: data) as? [String: Bool]
+    #expect(object == ["login": true, "ui": false])
+}
+
+@Test func configStatusRoundTrips() throws {
+    let status = ConfigStatus(config: Config(login: true, ui: true), path: "/x/config.json", onDisk: true)
+    let decoded = try JSONDecoder().decode(ConfigStatus.self, from: try JSONEncoder().encode(status))
+    #expect(decoded == status)
+}
+
+@Test func newErrorsHaveMessages() {
+    #expect(MBrightError.loginUnavailable(reason: "running from /tmp/mbrightd").description
+        == "Launch at login needs mbright installed as an app: running from /tmp/mbrightd. Run 'make install' first.")
+    #expect(MBrightError.configInvalid(path: "/x/config.json", reason: "bad json").description
+        == "Could not read /x/config.json: bad json")
+}

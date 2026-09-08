@@ -16,6 +16,7 @@ let package = Package(
         .target(name: "MBrightCore"),
         .target(name: "MBrightIPC", dependencies: ["MBrightCore"]),
         .target(name: "MBrightMenuBar", dependencies: ["MBrightCore", "MBrightIPC"]),
+        .target(name: "MBrightDaemon", dependencies: ["MBrightCore", "MBrightIPC"]),
         .executableTarget(
             name: "mbright",
             dependencies: [
@@ -29,6 +30,7 @@ let package = Package(
             dependencies: [
                 "MBrightCore",
                 "MBrightIPC",
+                "MBrightDaemon",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
@@ -39,5 +41,6 @@ let package = Package(
         .testTarget(name: "MBrightCoreTests", dependencies: ["MBrightCore"]),
         .testTarget(name: "MBrightIPCTests", dependencies: ["MBrightCore", "MBrightIPC"]),
         .testTarget(name: "MBrightMenuBarTests", dependencies: ["MBrightCore", "MBrightIPC", "MBrightMenuBar"]),
+        .testTarget(name: "MBrightDaemonTests", dependencies: ["MBrightCore", "MBrightIPC", "MBrightDaemon"]),
     ]
 )

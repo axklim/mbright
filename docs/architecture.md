@@ -39,13 +39,28 @@ the app is not (started by the CLI, say) would be what a launch activates
 instead of the menu bar app. Clients look for it next to their own executable first, then in
 `../Helpers`, then on `PATH`.
 
+It owns the config file: it reads `$XDG_CONFIG_HOME/mbright/config.json`
+at start (defaults when missing, a stderr warning when malformed) and is
+the only process that writes it. The `login` and `ui` keys drive one
+LaunchAgent plist, `com.axklim.mbright`, that starts either the menu bar
+app (which starts the daemon, as always) or `mbrightd` alone. The daemon
+reconciles the plist with the config on `reloadConfig`, on every
+`setConfig`, and at start when a config file loaded; with no config file
+the daemon leaves the plist alone at start. It never bootstraps the
+plist, and the plist has no `KeepAlive`, so Quit or `daemon
+stop` ends a login-started daemon until the next login. A daemon outside
+`mbright.app/Contents/Helpers` (a `make run` debug build) skips reconcile
+and refuses to enable login, so a scratch daemon never rewrites the real
+plist.
+
 **`mbright-menubar`** is a view. It never touches displays. It spawns the
 daemon if none is running, subscribes to events, rebuilds its menu on open
 and on hotplug, and its sliders follow brightness changes while the menu is
 open. It is a bare executable; the `.app` bundle `make install` writes is
 only a directory with an `Info.plist` around it, since the project builds
 with Command Line Tools only. That rules out `SMAppService`, so Launch at
-login is a LaunchAgent plist in `~/Library/LaunchAgents`.
+login is a LaunchAgent plist in `~/Library/LaunchAgents`, written by the
+daemon from its config.
 
 ## Libraries
 
@@ -53,7 +68,8 @@ login is a LaunchAgent plist in `~/Library/LaunchAgents`.
 | --- | --- |
 | `MBrightCore` | `BrightnessController`, `DisplaySelector`, `Percent`, display enumeration, the `dlopen` backend, the brightness change observer |
 | `MBrightIPC` | Wire messages, JSON-lines codec, Unix socket server and clients, daemon launcher |
-| `MBrightMenuBar` | AppKit: status item, slider views, Settings window, LaunchAgent |
+| `MBrightDaemon` | Config file, LaunchAgent plist, bundle detection, login reconcile, `SettingsHandler` |
+| `MBrightMenuBar` | AppKit: status item, slider views, Settings window |
 
 Hardware sits behind two protocols, `DisplayEnumerating` and
 `BrightnessBackend`. Everything above them is tested against fakes.
@@ -67,8 +83,10 @@ synthesized `Codable` encoding of these enums is the contract:
 ClientMessage { id, request }
 Request       = readings | get(target) | set(percent, target)
               | adjust(delta, target) | subscribe | version | shutdown
+              | config | setConfig(config) | reloadConfig | writeConfig
 ServerMessage = reply(id, response) | event(event)
 Response      = readings([DisplayReading]) | percent | ok | version | failure(MBrightError)
+              | config(ConfigStatus)
 Event         = displaysChanged | brightnessChanged(id, percent)
 ```
 
@@ -99,8 +117,8 @@ refreshes on every menu open.
 | File | Location |
 | --- | --- |
 | Socket | `$XDG_RUNTIME_DIR/mbright/mbrightd.sock` |
-| Config (planned, #6) | `$XDG_CONFIG_HOME/mbright/` |
-| LaunchAgent plist | `~/Library/LaunchAgents/com.axklim.mbright.menubar.plist` (launchd reads nowhere else) |
+| Config | `$XDG_CONFIG_HOME/mbright/config.json` (`{"login": false, "ui": true}` by default; only mbrightd writes it) |
+| LaunchAgent plist | `~/Library/LaunchAgents/com.axklim.mbright.plist` (launchd reads nowhere else) |
 | Install (`make install`) | `~/Applications/mbright.app`: clients in `Contents/MacOS`, `mbrightd` in `Contents/Helpers`; `~/.local/bin/mbright` symlinks into it |
 
 XDG rules: unset or empty means the default; a relative path is ignored.
@@ -110,10 +128,16 @@ dir, which has the same guarantees (per-user, local, private). The spec's
 fallback warning is deliberately not printed, since on macOS the fallback
 is the normal path.
 
-launchd does not inherit the shell environment, so enabling Launch at login
-writes the `XDG_RUNTIME_DIR` in force into the plist's
-`EnvironmentVariables`; otherwise a login-started app and a terminal CLI
-would resolve different sockets.
+launchd does not inherit the shell environment, so `enable-login` pins
+the `XDG_RUNTIME_DIR` and `XDG_CONFIG_HOME` in force (when set) into the
+plist's `EnvironmentVariables`. At start and on reload the daemon keeps
+whatever the plist already pins, so a daemon started from a terminal with
+a scratch runtime dir or config dir does not move the login socket or
+config file.
+
+Upgrading from a version whose Settings wrote
+`~/Library/LaunchAgents/com.axklim.mbright.menubar.plist`: remove that
+file by hand and run `mbright daemon enable-login`. Nothing migrates it.
 
 ## Private API policy
 

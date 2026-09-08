@@ -7,6 +7,11 @@ mbright set <0-100> [-d <sel>|--all]
 mbright up [<delta>] [-d <sel>|--all]     default 10, clamped at 100
 mbright down [<delta>] [-d <sel>|--all]   default 10, clamped at 0
 mbright daemon start|stop|status
+mbright daemon enable-login [--no-ui]   start at login; --no-ui starts mbrightd alone
+mbright daemon disable-login
+mbright config [show]                   config path and current settings
+mbright config init                     write the file from current settings
+mbright config reload                   re-read a hand-edited file
 ```
 
 Every command accepts `--daemon-autostart`. Without it, a missing daemon is
@@ -70,11 +75,40 @@ error listing them.
 
 Socket location and `XDG_RUNTIME_DIR` handling: `docs/architecture.md`.
 
+## daemon status, login and config
+
+`daemon status` prints the running line and then the login state:
+
+```
+mbrightd 0.4.0 is running on /var/folders/.../mbright/mbrightd.sock
+login: enabled, starts the menu bar app
+```
+
+`enable-login` and `disable-login` print the resulting login line.
+`enable-login` needs the installed app (`make install`); from a
+build-directory daemon it fails naming the path it runs from.
+`disable-login` works from any daemon, installed or not. Takes effect at
+the next login.
+
+`config show` prints the path, whether the file exists, and the values:
+
+```
+~/.config/mbright/config.json (not written yet)
+login: disabled
+ui: menu bar app
+```
+
+`config init` writes that file once and never overwrites it. `config
+reload` re-reads it after a hand edit and prints the same block; a
+malformed file is an error and the daemon keeps its previous settings.
+Only `mbrightd` touches the file, so every config command needs a running
+daemon or `--daemon-autostart`.
+
 ## Menu bar app
 
 `open -a mbright` (or Spotlight) puts a sun icon in the menu bar. Each display gets a
 slider; unsupported displays are listed without one. The menu follows
 hotplug and brightness changes made elsewhere. Settings has one option,
-Launch at login, which writes a LaunchAgent plist and takes effect at the
-next login. Quit asks the daemon to stop before the app exits, so the CLI
+Launch at login, the same setting as `mbright daemon enable-login`; it
+takes effect at the next login. Quit asks the daemon to stop before the app exits, so the CLI
 needs `mbright daemon start` or `--daemon-autostart` afterwards.

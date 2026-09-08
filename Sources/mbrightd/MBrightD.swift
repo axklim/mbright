@@ -2,6 +2,7 @@ import AppKit
 import ArgumentParser
 import Foundation
 import MBrightCore
+import MBrightDaemon
 import MBrightIPC
 
 @main
@@ -11,8 +12,9 @@ struct MBrightD: ParsableCommand {
         abstract: "Brightness daemon for the mbright CLI and menu bar app.",
         discussion: """
             Listens on $XDG_RUNTIME_DIR/mbright/mbrightd.sock, or the per-user temp dir \
-            when XDG_RUNTIME_DIR is unset. Runs in the foreground until SIGTERM or \
-            'mbright daemon stop'.
+            when XDG_RUNTIME_DIR is unset. Reads $XDG_CONFIG_HOME/mbright/config.json and \
+            keeps the login LaunchAgent in step with it. Runs in the foreground until \
+            SIGTERM or 'mbright daemon stop'.
             """,
         version: Version.current
     )
@@ -30,12 +32,23 @@ struct MBrightD: ParsableCommand {
         // Everything below runs on the main thread: `run()` is invoked from
         // `main`, and NSApplication.run keeps it there.
         MainActor.assumeIsolated {
+            let executable = Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? CommandLine.arguments[0]
+            let settings = SettingsHandler(
+                file: ConfigFile(url: ConfigFile.resolve()),
+                executable: executable,
+                agentURL: LaunchAgent.defaultFileURL,
+                bundle: InstalledBundle(daemonExecutable: executable),
+                environment: ProcessInfo.processInfo.environment,
+                log: { FileHandle.standardError.write(Data("\($0)\n".utf8)) })
+            settings.start()
+
             let server = LineServer(path: path, queue: .main) { request in
                 if request == .shutdown {
                     // Reply first; the server writes it before this runs.
                     DispatchQueue.main.async { Shutdown.perform() }
                     return .ok
                 }
+                if let response = MainActor.assumeIsolated({ settings.handle(request) }) { return response }
                 return handler.handle(request)
             }
             Shutdown.action = { server.stop(); Darwin.exit(0) }

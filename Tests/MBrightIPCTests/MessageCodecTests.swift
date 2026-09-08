@@ -20,6 +20,10 @@ private func roundTrip<T: Codable & Equatable>(_ value: T) throws -> T {
         ClientMessage(id: 6, request: .subscribe),
         ClientMessage(id: 7, request: .version),
         ClientMessage(id: 8, request: .shutdown),
+        ClientMessage(id: 9, request: .config),
+        ClientMessage(id: 10, request: .setConfig(Config(login: true, ui: false))),
+        ClientMessage(id: 11, request: .reloadConfig),
+        ClientMessage(id: 12, request: .writeConfig),
     ]
     for message in messages {
         #expect(try roundTrip(message) == message)
@@ -41,6 +45,9 @@ private func roundTrip<T: Codable & Equatable>(_ value: T) throws -> T {
         .reply(id: 6, response: .failure(.operationFailed(displayID: 3, code: -1))),
         .reply(id: 7, response: .failure(.malformedBrightnessValue(displayID: 3, value: 1.5))),
         .reply(id: 8, response: .failure(.partialFailure(failures: ["a: b"]))),
+        .reply(id: 9, response: .config(ConfigStatus(config: Config(login: true, ui: true), path: "/c.json", onDisk: false))),
+        .reply(id: 10, response: .failure(.loginUnavailable(reason: "r"))),
+        .reply(id: 11, response: .failure(.configInvalid(path: "/c.json", reason: "r"))),
         .event(.displaysChanged),
         .event(.brightnessChanged(id: 3, percent: 42)),
     ]

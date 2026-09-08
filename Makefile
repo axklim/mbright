@@ -46,9 +46,14 @@ else
 endif
 BINDIR := $(call tilde,$(BINDIR))
 
-# Written by the app's Launch at login setting; launchd reads only this path.
-LAUNCH_AGENT_LABEL := com.axklim.mbright.menubar
+# Written by mbrightd from the config's login key; launchd reads only this path.
+LAUNCH_AGENT_LABEL := com.axklim.mbright
 LAUNCH_AGENT       := $(HOME)/Library/LaunchAgents/$(LAUNCH_AGENT_LABEL).plist
+
+# The pre-config-file label. mbrightd never writes this one; uninstall only
+# ever removes it, as a courtesy for upgrades from that version.
+LEGACY_LAUNCH_AGENT_LABEL := com.axklim.mbright.menubar
+LEGACY_LAUNCH_AGENT       := $(HOME)/Library/LaunchAgents/$(LEGACY_LAUNCH_AGENT_LABEL).plist
 
 SWIFT_FLAGS := --scratch-path "$(BUILD_DIR)"
 TEST_ARGS   := $(if $(FILTER),--filter $(FILTER),)
@@ -133,13 +138,17 @@ install: build-release ## Build, stop anything running, install the app bundle, 
 	@open -a "$(APP)"
 
 # Only a symlink that points into the bundle is ours to remove. The
-# LaunchAgent is unloaded best-effort: the app never bootstraps it, so it is
-# only loaded if this login started the app.
+# LaunchAgent is unloaded best-effort: mbrightd never bootstraps it, so it is
+# only loaded if this login started mbright.
 uninstall: ## Stop anything running, remove the app bundle, CLI symlink and LaunchAgent
 	@$(call stop,$(APP_BIN),$(APP_HELPERS))
 	@launchctl bootout "gui/$$(id -u)/$(LAUNCH_AGENT_LABEL)" >/dev/null 2>&1 || true
 	@if [ -e "$(LAUNCH_AGENT)" ]; then \
 	  rm -f "$(LAUNCH_AGENT)" && echo "removed $(LAUNCH_AGENT)"; \
+	fi
+	@launchctl bootout "gui/$$(id -u)/$(LEGACY_LAUNCH_AGENT_LABEL)" >/dev/null 2>&1 || true
+	@if [ -e "$(LEGACY_LAUNCH_AGENT)" ]; then \
+	  rm -f "$(LEGACY_LAUNCH_AGENT)" && echo "removed $(LEGACY_LAUNCH_AGENT)"; \
 	fi
 	@if [ "$$(readlink "$(BINDIR)/mbright")" = "$(APP_BIN)/mbright" ]; then \
 	  rm -f "$(BINDIR)/mbright" && echo "removed $(BINDIR)/mbright"; \

@@ -26,6 +26,11 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible, Codable {
     /// The daemon hit an error that is not an `MBrightError`. Carries the
     /// description so the client can show it verbatim.
     case daemonFailure(String)
+    /// Launch at login needs the daemon to run from the installed app
+    /// bundle, so the plist has a stable program path to point at.
+    case loginUnavailable(reason: String)
+    /// The config file exists but could not be parsed.
+    case configInvalid(path: String, reason: String)
 
     public var description: String {
         switch self {
@@ -66,6 +71,10 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible, Codable {
             return "mbrightd is not running. Start it with 'mbright daemon start' or pass --daemon-autostart."
         case let .daemonFailure(message):
             return "mbrightd failed: \(message)"
+        case let .loginUnavailable(reason):
+            return "Launch at login needs mbright installed as an app: \(reason). Run 'make install' first."
+        case let .configInvalid(path, reason):
+            return "Could not read \(path): \(reason)"
         }
     }
 }

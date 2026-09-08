@@ -32,11 +32,17 @@ mbright down 10
 
 mbright daemon start          # the CLI talks to mbrightd; start it once
 mbright daemon stop
+mbright daemon enable-login   # start at login (also in the app's Settings)
 open -a mbright               # menu bar app with a slider per display
 ```
 
 The CLI needs `mbrightd` running. Start it once, or pass `--daemon-autostart`
 to any command. The menu bar app starts it by itself.
+
+Upgrading from a version whose Settings wrote
+`~/Library/LaunchAgents/com.axklim.mbright.menubar.plist`: remove that file
+by hand and run `mbright daemon enable-login`, or you get two menu bar icons
+at login.
 
 Full reference: [docs/cli.md](docs/cli.md). How it fits together:
 [docs/architecture.md](docs/architecture.md).

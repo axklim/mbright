@@ -44,12 +44,14 @@ at start (defaults when missing, a stderr warning when malformed) and is
 the only process that writes it. The `login` and `ui` keys drive one
 LaunchAgent plist, `com.axklim.mbright`, that starts either the menu bar
 app (which starts the daemon, as always) or `mbrightd` alone. The daemon
-reconciles the plist with the config at start, on `reloadConfig`, and on
-every `setConfig`; it never bootstraps it, and the plist has no
-`KeepAlive`, so Quit or `daemon stop` ends a login-started daemon until
-the next login. A daemon outside `mbright.app/Contents/Helpers` (a
-`make run` debug build) skips reconcile and refuses to enable login,
-so a scratch daemon never rewrites the real plist.
+reconciles the plist with the config on `reloadConfig`, on every
+`setConfig`, and at start when a config file loaded; with no config file
+the daemon leaves the plist alone at start. It never bootstraps the
+plist, and the plist has no `KeepAlive`, so Quit or `daemon
+stop` ends a login-started daemon until the next login. A daemon outside
+`mbright.app/Contents/Helpers` (a `make run` debug build) skips reconcile
+and refuses to enable login, so a scratch daemon never rewrites the real
+plist.
 
 **`mbright-menubar`** is a view. It never touches displays. It spawns the
 daemon if none is running, subscribes to events, rebuilds its menu on open
@@ -127,10 +129,11 @@ fallback warning is deliberately not printed, since on macOS the fallback
 is the normal path.
 
 launchd does not inherit the shell environment, so `enable-login` pins
-the `XDG_RUNTIME_DIR` in force into the plist's `EnvironmentVariables`.
-At start and on reload the daemon keeps whatever the plist already
-pins, so a daemon started from a terminal with a scratch runtime dir
-does not move the login socket.
+the `XDG_RUNTIME_DIR` and `XDG_CONFIG_HOME` in force (when set) into the
+plist's `EnvironmentVariables`. At start and on reload the daemon keeps
+whatever the plist already pins, so a daemon started from a terminal with
+a scratch runtime dir or config dir does not move the login socket or
+config file.
 
 Upgrading from a version whose Settings wrote
 `~/Library/LaunchAgents/com.axklim.mbright.menubar.plist`: remove that

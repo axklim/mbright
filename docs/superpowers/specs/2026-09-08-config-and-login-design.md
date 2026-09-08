@@ -136,8 +136,9 @@ display watcher. New units:
 
 Expected plist: label `com.axklim.mbright`, `RunAtLoad: true`, no
 `KeepAlive`, `ProgramArguments` = app executable when `ui` is true or the
-daemon when false, `EnvironmentVariables` = the `XDG_RUNTIME_DIR` in force
-if one is set (the existing `relevantEnvironment` rule).
+daemon when false, `EnvironmentVariables` = the `XDG_RUNTIME_DIR` and
+`XDG_CONFIG_HOME` in force, if set (the existing `relevantEnvironment`
+rule).
 
 | Trigger | `login` | Plist on disk | Action |
 | --- | --- | --- | --- |
@@ -160,13 +161,17 @@ Guard: when `InstalledBundle` is `nil` (a `make run` debug build, a bare
 `swift build`, a copy outside a bundle), start-time reconcile is skipped
 and `setConfig` with `login: true` fails with `loginUnavailable` without
 touching the file or the plist. `login: false` still saves and removes the
-plist, so a user can always turn it off.
+plist, so a user can always turn it off. Start-time reconcile is also
+skipped when the config file did not load (missing or malformed), bundle
+or not, so a daemon starting with no file never mistakes the default
+`login: false` for a request to remove an existing plist.
 
 ### Daemon start
 
 1. Load the config (defaults on missing or malformed, with a stderr line
    for malformed).
-2. If running from a bundle, reconcile the plist per the table.
+2. If a file loaded and the daemon is running from a bundle, reconcile the
+   plist per the table. Otherwise leave the plist alone.
 3. Continue as today.
 
 ### CLI

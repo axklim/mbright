@@ -84,10 +84,11 @@ mbrightd 0.4.0 is running on /var/folders/.../mbright/mbrightd.sock
 login: enabled, starts the menu bar app
 ```
 
-`enable-login` and `disable-login` print the resulting login line. Both
-need the installed app (`make install`); from a build-directory daemon
-`enable-login` fails naming the path it runs from. Takes effect at the next
-login.
+`enable-login` and `disable-login` print the resulting login line.
+`enable-login` needs the installed app (`make install`); from a
+build-directory daemon it fails naming the path it runs from.
+`disable-login` works from any daemon, installed or not. Takes effect at
+the next login.
 
 `config show` prints the path, whether the file exists, and the values:
 

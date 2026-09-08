@@ -50,6 +50,11 @@ BINDIR := $(call tilde,$(BINDIR))
 LAUNCH_AGENT_LABEL := com.axklim.mbright
 LAUNCH_AGENT       := $(HOME)/Library/LaunchAgents/$(LAUNCH_AGENT_LABEL).plist
 
+# The pre-config-file label. mbrightd never writes this one; uninstall only
+# ever removes it, as a courtesy for upgrades from that version.
+LEGACY_LAUNCH_AGENT_LABEL := com.axklim.mbright.menubar
+LEGACY_LAUNCH_AGENT       := $(HOME)/Library/LaunchAgents/$(LEGACY_LAUNCH_AGENT_LABEL).plist
+
 SWIFT_FLAGS := --scratch-path "$(BUILD_DIR)"
 TEST_ARGS   := $(if $(FILTER),--filter $(FILTER),)
 
@@ -140,6 +145,10 @@ uninstall: ## Stop anything running, remove the app bundle, CLI symlink and Laun
 	@launchctl bootout "gui/$$(id -u)/$(LAUNCH_AGENT_LABEL)" >/dev/null 2>&1 || true
 	@if [ -e "$(LAUNCH_AGENT)" ]; then \
 	  rm -f "$(LAUNCH_AGENT)" && echo "removed $(LAUNCH_AGENT)"; \
+	fi
+	@launchctl bootout "gui/$$(id -u)/$(LEGACY_LAUNCH_AGENT_LABEL)" >/dev/null 2>&1 || true
+	@if [ -e "$(LEGACY_LAUNCH_AGENT)" ]; then \
+	  rm -f "$(LEGACY_LAUNCH_AGENT)" && echo "removed $(LEGACY_LAUNCH_AGENT)"; \
 	fi
 	@if [ "$$(readlink "$(BINDIR)/mbright")" = "$(APP_BIN)/mbright" ]; then \
 	  rm -f "$(BINDIR)/mbright" && echo "removed $(BINDIR)/mbright"; \

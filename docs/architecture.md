@@ -36,9 +36,10 @@ the same socket refuses to start.
 **`mbright-menubar`** is a view. It never touches displays. It spawns the
 daemon if none is running, subscribes to events, rebuilds its menu on open
 and on hotplug, and its sliders follow brightness changes while the menu is
-open. It is a bare executable, not an `.app` bundle, because the project
-builds with Command Line Tools only; that rules out `SMAppService`, so
-Launch at login is a LaunchAgent plist in `~/Library/LaunchAgents`.
+open. It is a bare executable; the `.app` bundle `make install` writes is
+only a directory with an `Info.plist` around it, since the project builds
+with Command Line Tools only. That rules out `SMAppService`, so Launch at
+login is a LaunchAgent plist in `~/Library/LaunchAgents`.
 
 ## Libraries
 
@@ -94,6 +95,7 @@ refreshes on every menu open.
 | Socket | `$XDG_RUNTIME_DIR/mbright/mbrightd.sock` |
 | Config (planned, #6) | `$XDG_CONFIG_HOME/mbright/` |
 | LaunchAgent plist | `~/Library/LaunchAgents/com.axklim.mbright.menubar.plist` (launchd reads nowhere else) |
+| Install (`make install`) | `~/Applications/mbright.app` holding all three binaries; `~/.local/bin/mbright` symlinks into it |
 
 XDG rules: unset or empty means the default; a relative path is ignored.
 There is no other override. macOS never sets `XDG_RUNTIME_DIR`, so the

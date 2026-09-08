@@ -71,7 +71,7 @@ Socket location and `XDG_RUNTIME_DIR` handling: `docs/architecture.md`.
 
 ## Menu bar app
 
-`mbright-menubar &` puts a sun icon in the menu bar. Each display gets a
+`open -a mbright` (or Spotlight) puts a sun icon in the menu bar. Each display gets a
 slider; unsupported displays are listed without one. The menu follows
 hotplug and brightness changes made elsewhere. Settings has one option,
 Launch at login, which writes a LaunchAgent plist and takes effect at the

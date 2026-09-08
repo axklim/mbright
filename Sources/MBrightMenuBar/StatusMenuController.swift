@@ -186,7 +186,10 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
         settings.show()
     }
 
+    /// Stops the daemon too; a stuck one must not keep the app open, hence
+    /// the deadline.
     @objc private func quit() {
-        NSApp.terminate(nil)
+        connection.shutdownDaemon { NSApp.terminate(nil) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { NSApp.terminate(nil) }
     }
 }

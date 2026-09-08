@@ -1,6 +1,6 @@
-# The CLI and the menu bar app look for mbrightd next to their own executable
-# before falling back to PATH, so all three must be installed side by side.
-BINARIES := mbright mbrightd mbright-menubar
+# The CLI and the menu bar app look for mbrightd next to their own executable,
+# then in ../Helpers, before falling back to PATH.
+CLIENTS := mbright mbright-menubar
 
 # XDG Base Directory Specification v0.8.
 #
@@ -25,9 +25,14 @@ BUILD_DIR := $(XDG_CACHE_HOME)/mbright/build
 # The install is an app bundle so Spotlight, Raycast and the Dock can launch
 # the menu bar app. It is a plain directory with an Info.plist, no Xcode
 # involved. All three binaries live inside it; the CLI is reached through a
-# symlink in BINDIR, and the sibling-daemon lookup resolves symlinks.
-APP     := $(HOME)/Applications/mbright.app
-APP_BIN := $(APP)/Contents/MacOS
+# symlink in BINDIR, and the sibling-daemon lookup resolves symlinks. The
+# daemon goes in Contents/Helpers, not Contents/MacOS: anything running from
+# MacOS counts to LaunchServices as an instance of the app, so a daemon
+# running there while the app is not (started by the CLI, say) would be
+# what a launch activates instead of the menu bar app.
+APP         := $(HOME)/Applications/mbright.app
+APP_BIN     := $(APP)/Contents/MacOS
+APP_HELPERS := $(APP)/Contents/Helpers
 
 # An explicit PREFIX wins. Otherwise fall back to XDG_BIN_HOME, which is already
 # a bin directory rather than a prefix. No XDG spec defines it, but setups that
@@ -114,11 +119,12 @@ clean: ## Remove build products (fetched dependencies are kept)
 	swift package clean
 
 install: build-release ## Build, stop anything running, install the app bundle, launch it
-	@$(call stop,$(BUILD_DIR)/release,$(APP_BIN))
-	@mkdir -p "$(APP_BIN)" "$(BINDIR)"
-	@for b in $(BINARIES); do \
+	@$(call stop,$(BUILD_DIR)/release,$(APP_HELPERS))
+	@mkdir -p "$(APP_BIN)" "$(APP_HELPERS)" "$(BINDIR)"
+	@for b in $(CLIENTS); do \
 	  install -m 0755 "$(BUILD_DIR)/release/$$b" "$(APP_BIN)/$$b" || exit 1; \
 	done
+	@install -m 0755 "$(BUILD_DIR)/release/mbrightd" "$(APP_HELPERS)/mbrightd"
 	@sed "s/@VERSION@/$$("$(BUILD_DIR)/release/mbright" --version)/g" \
 	  scripts/Info.plist.in > "$(APP)/Contents/Info.plist"
 	@ln -sfn "$(APP_BIN)/mbright" "$(BINDIR)/mbright"
@@ -130,7 +136,7 @@ install: build-release ## Build, stop anything running, install the app bundle, 
 # LaunchAgent is unloaded best-effort: the app never bootstraps it, so it is
 # only loaded if this login started the app.
 uninstall: ## Stop anything running, remove the app bundle, CLI symlink and LaunchAgent
-	@$(call stop,$(APP_BIN),$(APP_BIN))
+	@$(call stop,$(APP_BIN),$(APP_HELPERS))
 	@launchctl bootout "gui/$$(id -u)/$(LAUNCH_AGENT_LABEL)" >/dev/null 2>&1 || true
 	@if [ -e "$(LAUNCH_AGENT)" ]; then \
 	  rm -f "$(LAUNCH_AGENT)" && echo "removed $(LAUNCH_AGENT)"; \

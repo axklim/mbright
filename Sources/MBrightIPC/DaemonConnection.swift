@@ -53,6 +53,18 @@ public final class DaemonConnection {
         }
     }
 
+    /// Asks the daemon to exit. `completion` runs once it has replied or
+    /// the socket closed. With no connection there is nothing to stop, and
+    /// `send` would spawn a daemon only to tell it to exit, so this
+    /// completes at once instead.
+    public func shutdownDaemon(completion: @escaping @MainActor () -> Void) {
+        guard isConnected else {
+            completion()
+            return
+        }
+        send(.shutdown) { _ in completion() }
+    }
+
     /// Asks for events. The request itself is sent by the connect path, so
     /// it is re-sent automatically after every reconnect.
     public func subscribe() {

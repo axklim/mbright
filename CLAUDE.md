@@ -11,8 +11,12 @@ pieces talk to each other.
   XCTest is unavailable. Tests need no hardware.
 - `make` wraps both and lists its targets. It builds into
   `$XDG_CACHE_HOME/mbright/build`, not `./.build`. `make install` puts all
-  three binaries inside `~/Applications/mbright.app` because clients look for
-  `mbrightd` next to their own executable; the CLI is a symlink into it.
+  three binaries inside `~/Applications/mbright.app`: the clients in
+  `Contents/MacOS`, `mbrightd` in `Contents/Helpers`. Clients look for
+  `mbrightd` next to their own executable, then in `../Helpers`. The CLI is
+  a symlink into the bundle. Keep the daemon out of `Contents/MacOS`, or
+  LaunchServices treats a running daemon as the running app and launching
+  the app does nothing.
   `make run` stops the installed app and runs the debug build in its place.
   Bare `swift build` still uses `./.build`.
 - The project must keep building with Command Line Tools only, no Xcode.

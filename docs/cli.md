@@ -62,7 +62,8 @@ error listing them.
 ## daemon
 
 - `start`: spawns `mbrightd` detached (own session, stdio to `/dev/null`),
-  looked up next to the `mbright` binary first, then on `PATH`. No-op if
+  looked up next to the `mbright` binary first, then in `../Helpers` (its
+  place in the app bundle), then on `PATH`. No-op if
   one is already running.
 - `status`: prints version and socket; exit 1 when not running.
 - `stop`: asks the daemon to exit. It replies, removes its socket, and exits.
@@ -75,5 +76,5 @@ Socket location and `XDG_RUNTIME_DIR` handling: `docs/architecture.md`.
 slider; unsupported displays are listed without one. The menu follows
 hotplug and brightness changes made elsewhere. Settings has one option,
 Launch at login, which writes a LaunchAgent plist and takes effect at the
-next login. Quit stops the app only; the daemon keeps running until
-`mbright daemon stop`.
+next login. Quit asks the daemon to stop before the app exits, so the CLI
+needs `mbright daemon start` or `--daemon-autostart` afterwards.

@@ -32,3 +32,45 @@ private func waitUntil(seconds: Double = 5, _ condition: () -> Bool) async {
         try? await Task.sleep(nanoseconds: 20_000_000)
     }
 }
+
+/// Quit in the menu bar app stops the daemon it is talking to.
+@MainActor
+@Test func shutdownDaemonSendsShutdownWhenConnected() async throws {
+    let received = Requests()
+    let harness = try Harness { request in
+        received.record(request)
+        return request == .shutdown ? .ok : makeHandler().handle(request)
+    }
+    let connection = DaemonConnection(path: harness.path)
+    var connected = false
+    connection.send(.version) { _ in connected = true }
+    await waitUntil { connected }
+
+    var finished = false
+    connection.shutdownDaemon { finished = true }
+    await waitUntil { finished }
+    #expect(received.values.contains(.shutdown))
+}
+
+/// With no daemon to talk to there is nothing to stop; in particular one
+/// must not be spawned just to be told to exit.
+@MainActor
+@Test func shutdownDaemonWithoutConnectionDoesNotStartOne() async throws {
+    let path = temporarySocketPath()
+    let connection = DaemonConnection(path: path)
+
+    var finished = false
+    connection.shutdownDaemon { finished = true }
+    await waitUntil { finished }
+    #expect(finished)
+    try await Task.sleep(nanoseconds: 200_000_000)
+    #expect(!connection.isConnected)
+    #expect(!FileManager.default.fileExists(atPath: path))
+}
+
+private final class Requests: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Request] = []
+    var values: [Request] { lock.withLock { storage } }
+    func record(_ request: Request) { lock.withLock { storage.append(request) } }
+}

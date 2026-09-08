@@ -19,8 +19,8 @@ private struct Sandbox {
 
     @MainActor
     func handler(bundle: InstalledBundle? = bundle, environment: [String: String] = [:],
-                 log: @escaping (String) -> Void = { _ in }) -> SettingsHandler {
-        SettingsHandler(file: file, agentURL: agentURL, bundle: bundle, environment: environment, log: log)
+                 agentURL: URL? = nil, log: @escaping (String) -> Void = { _ in }) -> SettingsHandler {
+        SettingsHandler(file: file, agentURL: agentURL ?? self.agentURL, bundle: bundle, environment: environment, log: log)
     }
 
     func remove() { try? FileManager.default.removeItem(at: dir) }
@@ -153,4 +153,21 @@ private struct Sandbox {
     #expect(handler.handle(.version) == nil)
     #expect(handler.handle(.readings) == nil)
     #expect(handler.handle(.shutdown) == nil)
+}
+
+@MainActor @Test func reconcileFailureReportsThatTheConfigWasSaved() throws {
+    let box = Sandbox("settings")
+    defer { box.remove() }
+    let blocker = box.dir.appendingPathComponent("blocker")
+    try Data().write(to: blocker)
+    let handler = box.handler(agentURL: blocker.appendingPathComponent("a.plist"))
+    handler.start()
+    let response = handler.handle(.setConfig(Config(login: true, ui: true)))
+    guard case let .failure(.daemonFailure(message)) = response else {
+        Issue.record("expected daemonFailure, got \(String(describing: response))")
+        return
+    }
+    #expect(message.contains("config saved to"))
+    #expect(try box.file.load() == Config(login: true, ui: true))
+    #expect(handler.config == Config(login: true, ui: true))
 }

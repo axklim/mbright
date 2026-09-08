@@ -82,12 +82,23 @@ public final class SettingsHandler {
         }
         try file.save(new)
         config = new
-        try reconcile(.explicit)
+        try reconcile(.explicit, orReport: "config saved to \(file.path)")
     }
 
     private func reload() throws {
         config = try file.load() ?? Config()
-        try reconcile(.start)
+        try reconcile(.start, orReport: "config reloaded from \(file.path)")
+    }
+
+    /// The config is already saved/reloaded by the time this runs, so a
+    /// failed plist update must not read back as a failed request: it is
+    /// reported as `daemonFailure`, not surfaced as the reconcile error.
+    private func reconcile(_ trigger: LoginReconciler.Trigger, orReport prefix: String) throws {
+        do {
+            try reconcile(trigger)
+        } catch {
+            throw MBrightError.daemonFailure("\(prefix), but could not update \(agentURL.path): \(error)")
+        }
     }
 
     private func reconcile(_ trigger: LoginReconciler.Trigger) throws {

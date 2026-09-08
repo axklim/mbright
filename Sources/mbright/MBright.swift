@@ -14,6 +14,7 @@ struct MBright: ParsableCommand {
             UpCommand.self,
             DownCommand.self,
             DaemonCommand.self,
+            ConfigCommand.self,
         ],
         defaultSubcommand: ListCommand.self
     )

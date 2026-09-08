@@ -46,8 +46,8 @@ else
 endif
 BINDIR := $(call tilde,$(BINDIR))
 
-# Written by the app's Launch at login setting; launchd reads only this path.
-LAUNCH_AGENT_LABEL := com.axklim.mbright.menubar
+# Written by mbrightd from the config's login key; launchd reads only this path.
+LAUNCH_AGENT_LABEL := com.axklim.mbright
 LAUNCH_AGENT       := $(HOME)/Library/LaunchAgents/$(LAUNCH_AGENT_LABEL).plist
 
 SWIFT_FLAGS := --scratch-path "$(BUILD_DIR)"
@@ -133,8 +133,8 @@ install: build-release ## Build, stop anything running, install the app bundle, 
 	@open -a "$(APP)"
 
 # Only a symlink that points into the bundle is ours to remove. The
-# LaunchAgent is unloaded best-effort: the app never bootstraps it, so it is
-# only loaded if this login started the app.
+# LaunchAgent is unloaded best-effort: mbrightd never bootstraps it, so it is
+# only loaded if this login started mbright.
 uninstall: ## Stop anything running, remove the app bundle, CLI symlink and LaunchAgent
 	@$(call stop,$(APP_BIN),$(APP_HELPERS))
 	@launchctl bootout "gui/$$(id -u)/$(LAUNCH_AGENT_LABEL)" >/dev/null 2>&1 || true

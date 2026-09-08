@@ -32,6 +32,7 @@ mbright down 10
 
 mbright daemon start          # the CLI talks to mbrightd; start it once
 mbright daemon stop
+mbright daemon enable-login   # start at login (also in the app's Settings)
 open -a mbright               # menu bar app with a slider per display
 ```
 

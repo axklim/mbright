@@ -8,8 +8,10 @@ func loginLine(_ config: Config) -> String {
     return "login: enabled, starts \(config.ui ? "the menu bar app" : "mbrightd only")"
 }
 
+func abbreviated(_ path: String) -> String { (path as NSString).abbreviatingWithTildeInPath }
+
 func describe(_ status: ConfigStatus) -> String {
-    let path = (status.path as NSString).abbreviatingWithTildeInPath
+    let path = abbreviated(status.path)
     return """
         \(path)\(status.onDisk ? "" : " (not written yet)")
         \(loginLine(status.config))
@@ -89,7 +91,7 @@ struct ConfigInit: ParsableCommand {
 
     func run() throws {
         let before = try configStatus(.config, autostart: daemon.daemonAutostart)
-        let path = (before.path as NSString).abbreviatingWithTildeInPath
+        let path = abbreviated(before.path)
         guard !before.onDisk else {
             print("\(path) already exists")
             return

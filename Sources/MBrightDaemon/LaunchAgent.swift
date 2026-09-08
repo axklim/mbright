@@ -10,8 +10,9 @@ public struct LaunchAgent: Equatable, Sendable {
 
     public let program: String
     /// launchd never inherits the shell environment, so the
-    /// `XDG_RUNTIME_DIR` in force is pinned here or the login-started
-    /// process would resolve a different socket than the CLI.
+    /// `XDG_RUNTIME_DIR` and `XDG_CONFIG_HOME` in force are pinned here or
+    /// the login-started process would resolve a different socket or
+    /// config file than the CLI.
     public let environment: [String: String]
 
     public init(program: String, environment: [String: String] = [:]) {
@@ -25,10 +26,18 @@ public struct LaunchAgent: Equatable, Sendable {
             .appendingPathComponent("\(label).plist")
     }
 
-    /// The subset of `environment` that changes where mbright puts files.
+    /// The subset of `environment` that changes where mbright puts files:
+    /// the runtime dir for the socket and the config dir for the config
+    /// file, each pinned only when set to a valid (non-empty, absolute) path.
     public static func relevantEnvironment(_ environment: [String: String]) -> [String: String] {
-        guard let runtime = SocketPath.xdgDirectory(environment[SocketPath.xdgRuntimeVariable]) else { return [:] }
-        return [SocketPath.xdgRuntimeVariable: runtime]
+        var result: [String: String] = [:]
+        if let runtime = SocketPath.xdgDirectory(environment[SocketPath.xdgRuntimeVariable]) {
+            result[SocketPath.xdgRuntimeVariable] = runtime
+        }
+        if let config = SocketPath.xdgDirectory(environment[ConfigFile.xdgConfigVariable]) {
+            result[ConfigFile.xdgConfigVariable] = config
+        }
+        return result
     }
 
     public var plist: [String: Any] {

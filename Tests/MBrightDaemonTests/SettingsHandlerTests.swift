@@ -20,7 +20,9 @@ private struct Sandbox {
     @MainActor
     func handler(bundle: InstalledBundle? = bundle, environment: [String: String] = [:],
                  agentURL: URL? = nil, log: @escaping (String) -> Void = { _ in }) -> SettingsHandler {
-        SettingsHandler(file: file, agentURL: agentURL ?? self.agentURL, bundle: bundle, environment: environment, log: log)
+        SettingsHandler(
+            file: file, executable: "/build/debug/mbrightd", agentURL: agentURL ?? self.agentURL,
+            bundle: bundle, environment: environment, log: log)
     }
 
     func remove() { try? FileManager.default.removeItem(at: dir) }
@@ -60,6 +62,26 @@ private struct Sandbox {
     #expect(LaunchAgent.read(at: box.agentURL) == LaunchAgent(program: bundle.daemon, environment: ["XDG_RUNTIME_DIR": "/run/user/501"]))
 }
 
+@MainActor @Test func startWithNoFileLeavesAnExistingPlistAlone() throws {
+    let box = Sandbox("settings")
+    defer { box.remove() }
+    try LaunchAgent(program: "/old").write(to: box.agentURL)
+    let handler = box.handler()
+    handler.start()
+    #expect(LaunchAgent.read(at: box.agentURL) == LaunchAgent(program: "/old"))
+    #expect(handler.config == Config())
+}
+
+@MainActor @Test func startOutsideABundleLeavesThePlistAlone() throws {
+    let box = Sandbox("settings")
+    defer { box.remove() }
+    try box.file.save(Config(login: false, ui: true))
+    try LaunchAgent(program: "/old").write(to: box.agentURL)
+    let handler = box.handler(bundle: nil)
+    handler.start()
+    #expect(LaunchAgent.read(at: box.agentURL) == LaunchAgent(program: "/old"))
+}
+
 @MainActor @Test func setConfigSavesReconcilesAndReplies() throws {
     let box = Sandbox("settings")
     defer { box.remove() }
@@ -85,6 +107,7 @@ private struct Sandbox {
         Issue.record("expected loginUnavailable, got \(String(describing: response))")
         return
     }
+    #expect(error.description.contains("/build/debug/mbrightd"))
     #expect(handler.config == Config())
     #expect(box.file.exists == false)
 }

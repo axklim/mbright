@@ -32,7 +32,7 @@ public struct ConfigFile: Sendable {
     public func load() throws -> Config? {
         guard exists else { return nil }
         do {
-            return try JSONDecoder().decode(Config.self, from: try Data(contentsOf: url))
+            return try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))
         } catch {
             throw MBrightError.configInvalid(path: url.path, reason: "\(error)")
         }

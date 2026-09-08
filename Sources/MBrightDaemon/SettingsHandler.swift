@@ -10,6 +10,7 @@ public final class SettingsHandler {
     public private(set) var config = Config()
 
     private let file: ConfigFile
+    private let executable: String
     private let agentURL: URL
     private let bundle: InstalledBundle?
     private let environment: [String: String]
@@ -17,12 +18,14 @@ public final class SettingsHandler {
 
     public init(
         file: ConfigFile,
+        executable: String,
         agentURL: URL,
         bundle: InstalledBundle?,
         environment: [String: String],
         log: @escaping (String) -> Void
     ) {
         self.file = file
+        self.executable = executable
         self.agentURL = agentURL
         self.bundle = bundle
         self.environment = environment
@@ -30,14 +33,22 @@ public final class SettingsHandler {
     }
 
     /// The daemon must come up whatever the file says, so a malformed file
-    /// is logged and left in place rather than fatal or overwritten.
+    /// is logged and left in place rather than fatal or overwritten. With
+    /// no file, or outside a bundle, the config defaults to login: false;
+    /// reconciling that against an existing plist would delete it, so the
+    /// plist is only touched at start when a file actually loaded and the
+    /// daemon can act on it.
     public func start() {
+        let loaded: Config?
         do {
-            config = try file.load() ?? Config()
+            loaded = try file.load()
+            config = loaded ?? Config()
         } catch {
             log("Warning: \(error); using defaults")
+            loaded = nil
             config = Config()
         }
+        guard loaded != nil, bundle != nil else { return }
         do {
             try reconcile(.start)
         } catch {
@@ -78,7 +89,7 @@ public final class SettingsHandler {
 
     private func set(_ new: Config) throws {
         if new.login, bundle == nil {
-            throw MBrightError.loginUnavailable(reason: "mbrightd is running from \(CommandLine.arguments[0])")
+            throw MBrightError.loginUnavailable(reason: "mbrightd is running from \(executable)")
         }
         try file.save(new)
         config = new

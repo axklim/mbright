@@ -35,6 +35,7 @@ struct MBrightD: ParsableCommand {
             let executable = Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? CommandLine.arguments[0]
             let settings = SettingsHandler(
                 file: ConfigFile(url: ConfigFile.resolve()),
+                executable: executable,
                 agentURL: LaunchAgent.defaultFileURL,
                 bundle: InstalledBundle(daemonExecutable: executable),
                 environment: ProcessInfo.processInfo.environment,

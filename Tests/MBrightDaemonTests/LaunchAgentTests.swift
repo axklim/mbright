@@ -19,11 +19,18 @@ import Testing
     #expect(decoded?["EnvironmentVariables"] as? [String: String] == ["XDG_RUNTIME_DIR": "/run/user/501"])
 }
 
-@Test func relevantEnvironmentKeepsOnlyAValidRuntimeDir() {
-    #expect(LaunchAgent.relevantEnvironment(["XDG_RUNTIME_DIR": "/run/user/501", "PATH": "/bin", "HOME": "/h"])
+@Test func relevantEnvironmentKeepsOnlyValidXDGDirs() {
+    #expect(LaunchAgent.relevantEnvironment([
+        "XDG_RUNTIME_DIR": "/run/user/501", "XDG_CONFIG_HOME": "/h/.config", "PATH": "/bin", "HOME": "/h",
+    ]) == ["XDG_RUNTIME_DIR": "/run/user/501", "XDG_CONFIG_HOME": "/h/.config"])
+    #expect(LaunchAgent.relevantEnvironment(["XDG_RUNTIME_DIR": "/run/user/501"])
         == ["XDG_RUNTIME_DIR": "/run/user/501"])
+    #expect(LaunchAgent.relevantEnvironment(["XDG_CONFIG_HOME": "/h/.config"])
+        == ["XDG_CONFIG_HOME": "/h/.config"])
     #expect(LaunchAgent.relevantEnvironment(["XDG_RUNTIME_DIR": ""]).isEmpty)
     #expect(LaunchAgent.relevantEnvironment(["XDG_RUNTIME_DIR": "rel"]).isEmpty)
+    #expect(LaunchAgent.relevantEnvironment(["XDG_CONFIG_HOME": ""]).isEmpty)
+    #expect(LaunchAgent.relevantEnvironment(["XDG_CONFIG_HOME": "rel"]).isEmpty)
     #expect(LaunchAgent.relevantEnvironment([:]).isEmpty)
 }
 

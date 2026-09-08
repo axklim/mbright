@@ -3,19 +3,19 @@ import Foundation
 import MBrightCore
 import MBrightIPC
 
-/// A single-pane settings window. The one setting is Launch at login.
+/// A single-pane settings window. The one setting is Launch at login,
+/// which lives in the daemon's config; this window only sends requests
+/// and shows what comes back.
 @MainActor
 final class SettingsWindowController {
     private let window: NSWindow
     private let launchAtLogin = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
     private let status = NSTextField(wrappingLabelWithString: "")
-    private let agent: LaunchAgent
+    private let connection: DaemonConnection
+    private var current = Config()
 
-    init() {
-        let executable = Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? CommandLine.arguments[0]
-        agent = LaunchAgent(
-            executablePath: executable,
-            environment: LaunchAgent.relevantEnvironment(ProcessInfo.processInfo.environment))
+    init(connection: DaemonConnection) {
+        self.connection = connection
 
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 130),
@@ -54,23 +54,37 @@ final class SettingsWindowController {
     }
 
     func show() {
-        launchAtLogin.state = agent.isEnabled ? .on : .off
-        var text = "Takes effect at the next login. Writes \(agent.fileURL.path)."
-        if let runtime = agent.environment[SocketPath.xdgRuntimeVariable] {
-            text += " Pins XDG_RUNTIME_DIR to \(runtime) so the app and the CLI share one daemon."
+        launchAtLogin.isEnabled = false
+        status.stringValue = "Takes effect at the next login."
+        connection.send(.config) { [weak self] response in
+            self?.apply(response)
         }
-        status.stringValue = text
         window.center()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
 
     @objc private func toggleLaunchAtLogin() {
-        do {
-            try agent.setEnabled(launchAtLogin.state == .on)
-        } catch {
-            launchAtLogin.state = agent.isEnabled ? .on : .off
-            status.stringValue = "Could not update launch agent: \(error.localizedDescription)"
+        launchAtLogin.isEnabled = false
+        let wanted = launchAtLogin.state == .on
+        connection.send(.setConfig(Config(login: wanted, ui: true))) { [weak self] response in
+            self?.apply(response)
         }
+    }
+
+    /// The checkbox always shows what the daemon holds, so a failed change
+    /// snaps it back.
+    private func apply(_ response: Response) {
+        launchAtLogin.isEnabled = true
+        switch response {
+        case let .config(configStatus):
+            current = configStatus.config
+            status.stringValue = "Takes effect at the next login."
+        case let .failure(error):
+            status.stringValue = "\(error)"
+        default:
+            status.stringValue = "Unexpected reply from mbrightd."
+        }
+        launchAtLogin.state = current.login ? .on : .off
     }
 }

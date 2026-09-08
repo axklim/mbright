@@ -16,6 +16,13 @@ public enum Request: Equatable, Sendable, Codable {
     /// Asks the daemon to exit after replying. Handled by the daemon
     /// executable, not the request handler.
     case shutdown
+    /// Config requests are handled by the daemon executable, not the
+    /// request handler. All four reply with `.config(ConfigStatus)`.
+    case config
+    case setConfig(Config)
+    case reloadConfig
+    /// Creates the file from the current config if none exists.
+    case writeConfig
 }
 
 public enum Response: Equatable, Sendable, Codable {
@@ -23,6 +30,7 @@ public enum Response: Equatable, Sendable, Codable {
     case percent(Int)
     case ok
     case version(String)
+    case config(ConfigStatus)
     case failure(MBrightError)
 }
 

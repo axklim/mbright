@@ -56,5 +56,10 @@ import Testing
     #expect(handler.handle(.subscribe) == .ok)
     // Exiting is the daemon executable's job; the handler only acknowledges.
     #expect(handler.handle(.shutdown) == .ok)
+    // Config is the daemon executable's job too; the handler only acknowledges.
+    #expect(handler.handle(.config) == .ok)
+    #expect(handler.handle(.setConfig(Config())) == .ok)
+    #expect(handler.handle(.reloadConfig) == .ok)
+    #expect(handler.handle(.writeConfig) == .ok)
     #expect(backend.writes.isEmpty)
 }

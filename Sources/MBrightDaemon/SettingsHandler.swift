@@ -8,6 +8,8 @@ import MBrightIPC
 @MainActor
 public final class SettingsHandler {
     public private(set) var config = Config()
+    /// Called with the new config after a successful set or reload.
+    public var onChange: ((Config) -> Void)?
 
     private let file: ConfigFile
     private let executable: String
@@ -93,11 +95,13 @@ public final class SettingsHandler {
         }
         try file.save(new)
         config = new
+        onChange?(new)
         try reconcile(.explicit, orReport: "config saved to \(file.path)")
     }
 
     private func reload() throws {
         config = try file.load() ?? Config()
+        onChange?(config)
         try reconcile(.start, orReport: "config reloaded from \(file.path)")
     }
 

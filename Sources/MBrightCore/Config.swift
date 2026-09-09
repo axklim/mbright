@@ -1,21 +1,33 @@
+/// How the other displays follow the main display.
+public enum SyncMode: String, CaseIterable, Equatable, Sendable, Codable {
+    case off
+    /// Other displays are set to the main display's value.
+    case full
+    /// Other displays move by the same delta as the main display.
+    case relative
+}
+
 /// User settings. Owned by the daemon; clients only see it through the
 /// wire. Missing keys decode to their defaults so an older file stays
 /// valid when a key is added.
 public struct Config: Equatable, Sendable, Codable {
     public var login: Bool
     public var ui: Bool
+    public var sync: SyncMode
 
-    public init(login: Bool = false, ui: Bool = true) {
+    public init(login: Bool = false, ui: Bool = true, sync: SyncMode = .off) {
         self.login = login
         self.ui = ui
+        self.sync = sync
     }
 
-    private enum CodingKeys: String, CodingKey { case login, ui }
+    private enum CodingKeys: String, CodingKey { case login, ui, sync }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         login = try container.decodeIfPresent(Bool.self, forKey: .login) ?? false
         ui = try container.decodeIfPresent(Bool.self, forKey: .ui) ?? true
+        sync = try container.decodeIfPresent(SyncMode.self, forKey: .sync) ?? .off
     }
 }
 

@@ -56,7 +56,9 @@ public struct BrightnessController: Sendable {
 
     // MARK: - Internals
 
-    func resolve(_ target: Target) throws -> [DisplayInfo] {
+    /// The displays a target names, in list order. Public so the daemon's
+    /// sync can tell which displays a request wrote.
+    public func resolve(_ target: Target) throws -> [DisplayInfo] {
         let displays = try enumerator.onlineDisplays()
         guard !displays.isEmpty else { throw MBrightError.noDisplays }
 

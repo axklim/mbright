@@ -42,20 +42,29 @@ struct MBrightD: ParsableCommand {
                 log: { FileHandle.standardError.write(Data("\($0)\n".utf8)) })
             settings.start()
 
+            let sync = BrightnessSync(controller: controller) {
+                FileHandle.standardError.write(Data("\($0)\n".utf8))
+            }
+            settings.onChange = { sync.setMode($0.sync) }
+            sync.setMode(settings.config.sync)
+
             let server = LineServer(path: path, queue: .main) { request in
                 if request == .shutdown {
                     // Reply first; the server writes it before this runs.
                     DispatchQueue.main.async { Shutdown.perform() }
                     return .ok
                 }
-                if let response = MainActor.assumeIsolated({ settings.handle(request) }) { return response }
-                return handler.handle(request)
+                return MainActor.assumeIsolated {
+                    settings.handle(request) ?? sync.handle(request) ?? handler.handle(request)
+                }
             }
             Shutdown.action = { server.stop(); Darwin.exit(0) }
 
             let observer = DisplayServicesBrightnessObserver { id, value in
                 DispatchQueue.main.async {
-                    server.broadcast(.brightnessChanged(id: id, percent: Percent.fromDevice(value)))
+                    let percent = Percent.fromDevice(value)
+                    server.broadcast(.brightnessChanged(id: id, percent: percent))
+                    MainActor.assumeIsolated { sync.brightnessChanged(id: id, percent: percent) }
                 }
             }
             let observeAll: @MainActor () -> Void = {
@@ -64,6 +73,7 @@ struct MBrightD: ParsableCommand {
 
             DisplayWatcher.start {
                 observeAll()
+                sync.displaysChanged()
                 server.broadcast(.displaysChanged)
             }
             SignalHandler.install { Shutdown.perform() }

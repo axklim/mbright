@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import MBrightCore
 
-@Test func configDefaultsAreLoginOffUIOn() {
-    #expect(Config() == Config(login: false, ui: true))
+@Test func configDefaultsAreLoginOffUIOnSyncOff() {
+    #expect(Config() == Config(login: false, ui: true, sync: .off))
 }
 
 @Test func configDecodesMissingKeysAsDefaultsAndIgnoresUnknownKeys() throws {
@@ -14,10 +14,24 @@ import Testing
         == Config(login: true, ui: false))
 }
 
-@Test func configEncodesBothKeys() throws {
-    let data = try JSONEncoder().encode(Config(login: true, ui: false))
-    let object = try JSONSerialization.jsonObject(with: data) as? [String: Bool]
-    #expect(object == ["login": true, "ui": false])
+@Test func configDecodesEverySyncModeAndRejectsUnknownOnes() throws {
+    let decoder = JSONDecoder()
+    for mode in SyncMode.allCases {
+        let json = #"{"sync": "\#(mode.rawValue)"}"#
+        #expect(try decoder.decode(Config.self, from: Data(json.utf8)) == Config(sync: mode))
+    }
+    #expect(throws: DecodingError.self) {
+        try decoder.decode(Config.self, from: Data(#"{"sync": "sideways"}"#.utf8))
+    }
+}
+
+@Test func configEncodesEveryKey() throws {
+    let data = try JSONEncoder().encode(Config(login: true, ui: false, sync: .relative))
+    let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    #expect(object?["login"] as? Bool == true)
+    #expect(object?["ui"] as? Bool == false)
+    #expect(object?["sync"] as? String == "relative")
+    #expect(object?.count == 3)
 }
 
 @Test func configStatusRoundTrips() throws {

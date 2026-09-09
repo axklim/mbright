@@ -29,6 +29,7 @@ mbright get -d ultrafine      # one display, bare integer for scripts
 mbright set 80 --all          # absolute, 0-100
 mbright up 10 -d studio       # relative, clamped
 mbright down 10
+mbright sync relative         # other displays follow the main display's changes
 
 mbright daemon start          # the CLI talks to mbrightd; start it once
 mbright daemon stop

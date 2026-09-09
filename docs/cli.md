@@ -6,6 +6,7 @@ mbright get [-d <sel>]               one display, bare integer
 mbright set <0-100> [-d <sel>|--all]
 mbright up [<delta>] [-d <sel>|--all]     default 10, clamped at 100
 mbright down [<delta>] [-d <sel>|--all]   default 10, clamped at 0
+mbright sync [off|full|relative]     other displays follow the main display
 mbright daemon start|stop|status
 mbright daemon enable-login [--no-ui]   start at login; --no-ui starts mbrightd alone
 mbright daemon disable-login
@@ -47,6 +48,19 @@ clamp at the ends, so a hotkey held at the limit is a no-op, not an error.
 A negative delta is a usage error; use `down`. Under `--all`, a failure on
 one display does not abort the others; every failure is reported and the
 exit is non-zero.
+
+## sync
+
+Without an argument prints the mode. With one, saves it to the config
+and prints the result. `full` sets every other display to the main
+display's value, at once and on every later change. `relative` moves
+every other display by the same amount as the main display and keeps
+each display's own level; adjusting a secondary changes its distance
+from main. Both react to any change to main: the CLI, the menu bar,
+keyboard keys, System Settings, or auto-brightness. `set`, `up` and
+`down` with `--all` write every display once; sync does not add to
+that. A failed write to a secondary is reported the way `--all` reports
+one.
 
 ## Selecting a display: `--display` / `-d`
 
@@ -96,6 +110,7 @@ the next login.
 ~/.config/mbright/config.json (not written yet)
 login: disabled
 ui: menu bar app
+sync: off
 ```
 
 `config init` writes that file once and never overwrites it. `config
@@ -108,7 +123,8 @@ daemon or `--daemon-autostart`.
 
 `open -a mbright` (or Spotlight) puts a sun icon in the menu bar. Each display gets a
 slider; unsupported displays are listed without one. The menu follows
-hotplug and brightness changes made elsewhere. Settings has one option,
-Launch at login, the same setting as `mbright daemon enable-login`; it
-takes effect at the next login. Quit asks the daemon to stop before the app exits, so the CLI
+hotplug and brightness changes made elsewhere. Settings has Launch at login,
+the same setting as `mbright daemon enable-login` (takes effect at the next
+login), and Sync with main display, the same setting as `mbright sync`. Quit
+asks the daemon to stop before the app exits, so the CLI
 needs `mbright daemon start` or `--daemon-autostart` afterwards.

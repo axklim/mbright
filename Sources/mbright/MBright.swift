@@ -13,6 +13,7 @@ struct MBright: ParsableCommand {
             SetCommand.self,
             UpCommand.self,
             DownCommand.self,
+            SyncCommand.self,
             DaemonCommand.self,
             ConfigCommand.self,
         ],

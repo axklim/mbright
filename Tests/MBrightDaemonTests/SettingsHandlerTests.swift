@@ -194,3 +194,27 @@ private struct Sandbox {
     #expect(try box.file.load() == Config(login: true, ui: true))
     #expect(handler.config == Config(login: true, ui: true))
 }
+
+@MainActor @Test func onChangeFiresAfterSetAndReloadWithTheNewConfig() throws {
+    let box = Sandbox("settings")
+    defer { box.remove() }
+    let handler = box.handler()
+    var seen: [Config] = []
+    handler.onChange = { seen.append($0) }
+    handler.start()
+    #expect(seen.isEmpty)
+
+    let relative = Config(sync: .relative)
+    _ = handler.handle(.setConfig(relative))
+    #expect(seen == [relative])
+
+    try box.file.save(Config(sync: .full))
+    _ = handler.handle(.reloadConfig)
+    #expect(seen == [relative, Config(sync: .full)])
+
+    // A failed set does not fire.
+    let nonBundle = box.handler(bundle: nil)
+    nonBundle.onChange = { seen.append($0) }
+    _ = nonBundle.handle(.setConfig(Config(login: true)))
+    #expect(seen.count == 2)
+}

@@ -68,7 +68,7 @@ daemon from its config.
 | --- | --- |
 | `MBrightCore` | `BrightnessController`, `DisplaySelector`, `Percent`, display enumeration, the `dlopen` backend, the brightness change observer |
 | `MBrightIPC` | Wire messages, JSON-lines codec, Unix socket server and clients, daemon launcher |
-| `MBrightDaemon` | Config file, LaunchAgent plist, bundle detection, login reconcile, `SettingsHandler` |
+| `MBrightDaemon` | Config file, LaunchAgent plist, bundle detection, login reconcile, `SettingsHandler`, `BrightnessSync` |
 | `MBrightMenuBar` | AppKit: status item, slider views, Settings window |
 
 Hardware sits behind two protocols, `DisplayEnumerating` and
@@ -112,12 +112,40 @@ auto-brightness. Signature confirmed against Lunar and SketchyBar and
 verified on the target machine. If the symbol is missing, the app still
 refreshes on every menu open.
 
+The daemon also feeds every brightness notification to `BrightnessSync`
+(below), after broadcasting it.
+
+## Brightness sync
+
+`sync` in the config is `off`, `full` (other displays are set to main's
+value) or `relative` (other displays move by main's delta and keep their
+own level). `BrightnessSync` in `MBrightDaemon` handles `set` and
+`adjust` ahead of `RequestHandler` and keeps main's last known percent
+in every mode.
+
+A request that writes main alone propagates inside the request; a
+propagation failure comes back as the same `partialFailure` that `--all`
+produces. A request that writes main together with other displays
+(`--all`) only refreshes the last known value: the user addressed every
+display. A brightness notification for main whose value differs from the
+last known one is a change made by someone else (keyboard keys, System
+Settings, auto-brightness) and propagates, with failures logged to
+stderr. An equal value is the daemon's own write and is ignored; a
+secondary's notification is never acted on. That is the whole loop
+guard.
+
+Switching to `full`, starting with it, reloading into it, and a hotplug
+under it all set the other displays to main's value at once. Switching
+to `relative` or `off` touches nothing. A main display without
+brightness control leaves sync idle. Relative clamps at 0 and 100 and
+forgets the lost part of a delta.
+
 ## Files (XDG Base Directory)
 
 | File | Location |
 | --- | --- |
 | Socket | `$XDG_RUNTIME_DIR/mbright/mbrightd.sock` |
-| Config | `$XDG_CONFIG_HOME/mbright/config.json` (`{"login": false, "ui": true}` by default; only mbrightd writes it) |
+| Config | `$XDG_CONFIG_HOME/mbright/config.json` (`{"login": false, "ui": true, "sync": "off"}` by default; only mbrightd writes it) |
 | LaunchAgent plist | `~/Library/LaunchAgents/com.axklim.mbright.plist` (launchd reads nowhere else) |
 | Install (`make install`) | `~/Applications/mbright.app`: clients in `Contents/MacOS`, `mbrightd` in `Contents/Helpers`; `~/.local/bin/mbright` symlinks into it |
 

@@ -8,6 +8,14 @@ func loginLine(_ config: Config) -> String {
     return "login: enabled, starts \(config.ui ? "the menu bar app" : "mbrightd only")"
 }
 
+func syncLine(_ config: Config) -> String {
+    switch config.sync {
+    case .off: return "sync: off"
+    case .full: return "sync: full, other displays match the main display"
+    case .relative: return "sync: relative, other displays follow the main display's changes"
+    }
+}
+
 func abbreviated(_ path: String) -> String { (path as NSString).abbreviatingWithTildeInPath }
 
 func describe(_ status: ConfigStatus) -> String {
@@ -16,6 +24,7 @@ func describe(_ status: ConfigStatus) -> String {
         \(path)\(status.onDisk ? "" : " (not written yet)")
         \(loginLine(status.config))
         ui: \(status.config.ui ? "menu bar app" : "mbrightd only")
+        \(syncLine(status.config))
         """
 }
 
@@ -37,7 +46,11 @@ struct DaemonEnableLogin: ParsableCommand {
     @OptionGroup var daemon: DaemonOptions
 
     func run() throws {
-        let status = try configStatus(.setConfig(Config(login: true, ui: !noUI)), autostart: daemon.daemonAutostart)
+        // Read first so the sync key survives; only login and ui change here.
+        var config = try configStatus(.config, autostart: daemon.daemonAutostart).config
+        config.login = true
+        config.ui = !noUI
+        let status = try configStatus(.setConfig(config), autostart: daemon.daemonAutostart)
         print(loginLine(status.config))
     }
 }

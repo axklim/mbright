@@ -10,6 +10,7 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
     private let settings: SettingsWindowController
+    private let debug = DebugLog(url: DebugLog.resolve(name: "mbright-menubar"))
 
     private var rows: [DisplayRow] = []
     private var lastFailure: String?
@@ -35,15 +36,33 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
 
         connection.onEvent = { [weak self] event in
+            guard let self else { return }
             switch event {
             case .displaysChanged:
-                self?.refresh()
+                debug.log("event displaysChanged")
+                refresh()
             case let .brightnessChanged(id, percent):
-                self?.brightnessChanged(id: id, percent: percent)
+                debug.log("event brightnessChanged \(id) \(percent)%")
+                brightnessChanged(id: id, percent: percent)
+            case let .configChanged(config):
+                if config.debug { debug.setEnabled(true) }
+                debug.log("event configChanged \(config)")
+                if !config.debug { debug.setEnabled(false) }
             }
         }
         connection.onDisconnect = { [weak self] reason in
+            self?.debug.log("disconnected: \(reason)")
             self?.lastFailure = reason
+        }
+        // The debug setting lives in the daemon; ask on every connect so a
+        // daemon restarted with a different config is followed too.
+        connection.onConnect = { [weak self] in
+            guard let self else { return }
+            connection.send(.config) { [weak self] response in
+                guard let self, case let .config(status) = response else { return }
+                debug.setEnabled(status.config.debug)
+                debug.log("mbright-menubar \(Version.current) connected, pid \(getpid()), config \(status.config)")
+            }
         }
         connection.subscribe()
         refresh()
@@ -53,12 +72,14 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
 
     public func menuWillOpen(_ menu: NSMenu) {
         isMenuOpen = true
+        debug.log("menu opening with cached rows \(Self.describe(rows))")
         rebuild()
         refresh()
     }
 
     public func menuDidClose(_ menu: NSMenu) {
         isMenuOpen = false
+        debug.log("menu closed")
     }
 
     // MARK: - Data
@@ -70,12 +91,15 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
             case let .readings(readings):
                 rows = MenuModel.rows(from: readings)
                 lastFailure = nil
+                debug.log("readings \(Self.describe(rows))")
             case let .failure(error):
                 rows = []
                 lastFailure = error.description
+                debug.log("readings failed: \(error)")
             default:
                 rows = []
                 lastFailure = "unexpected reply from mbrightd"
+                debug.log("readings: unexpected reply")
             }
             if isMenuOpen { rebuild() }
         }
@@ -97,11 +121,13 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
             return
         }
         inFlight.insert(id)
+        debug.log("set \(id) \(percent)%")
         connection.send(.set(percent: percent, target: .id(id))) { [weak self] response in
             guard let self else { return }
             inFlight.remove(id)
             if case let .failure(error) = response {
                 lastFailure = error.description
+                debug.log("set \(id) failed: \(error)")
             }
             if let next = queued.removeValue(forKey: id) {
                 setBrightness(next, for: id)
@@ -117,12 +143,14 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
     private func rebuild() {
         let rowIDs = rows.map(\.id)
         if Set(sliderViews.keys) == Set(rowIDs), !rows.isEmpty {
+            debug.log("rebuild: reusing slider views for \(rowIDs)")
             for row in rows {
                 if let percent = row.percent { sliderViews[row.id]?.update(percent: percent) }
             }
             return
         }
 
+        debug.log("rebuild: recreating views, had \(sliderViews.keys.sorted()), rows \(Self.describe(rows))")
         menu.removeAllItems()
         sliderViews = [:]
 
@@ -148,6 +176,12 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit mbright", action: #selector(quit), keyEquivalent: "q").target = self
+    }
+
+    private static func describe(_ rows: [DisplayRow]) -> String {
+        "[" + rows.map { row in
+            "\(row.name) (\(row.id)) " + (row.percent.map { "\($0)%" } ?? "no slider: \(row.detail ?? "")")
+        }.joined(separator: ", ") + "]"
     }
 
     private func disabled(_ title: String) -> NSMenuItem {

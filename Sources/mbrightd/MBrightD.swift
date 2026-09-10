@@ -32,6 +32,7 @@ struct MBrightD: ParsableCommand {
         // Everything below runs on the main thread: `run()` is invoked from
         // `main`, and NSApplication.run keeps it there.
         MainActor.assumeIsolated {
+            let debug = DebugLog(url: DebugLog.resolve(name: "mbrightd"))
             let executable = Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? CommandLine.arguments[0]
             let settings = SettingsHandler(
                 file: ConfigFile(url: ConfigFile.resolve()),
@@ -41,28 +42,43 @@ struct MBrightD: ParsableCommand {
                 environment: ProcessInfo.processInfo.environment,
                 log: { FileHandle.standardError.write(Data("\($0)\n".utf8)) })
             settings.start()
+            debug.setEnabled(settings.config.debug)
+            debug.log("mbrightd \(Version.current) starting, pid \(getpid()), socket \(path), config \(settings.config)")
 
-            let sync = BrightnessSync(controller: controller) {
+            let sync = BrightnessSync(controller: controller, debug: { debug.log($0) }) {
                 FileHandle.standardError.write(Data("\($0)\n".utf8))
+                debug.log($0)
             }
-            settings.onChange = { sync.setMode($0.sync) }
-            sync.setMode(settings.config.sync)
 
             let server = LineServer(path: path, queue: .main) { request in
                 if request == .shutdown {
+                    debug.log("request shutdown")
                     // Reply first; the server writes it before this runs.
                     DispatchQueue.main.async { Shutdown.perform() }
                     return .ok
                 }
                 return MainActor.assumeIsolated {
-                    settings.handle(request) ?? sync.handle(request) ?? handler.handle(request)
+                    let response = settings.handle(request) ?? sync.handle(request) ?? handler.handle(request)
+                    debug.log("request \(Describe.request(request)) -> \(Describe.response(response))")
+                    return response
                 }
             }
-            Shutdown.action = { server.stop(); Darwin.exit(0) }
+            Shutdown.action = { debug.log("exiting"); server.stop(); Darwin.exit(0) }
 
-            let observer = DisplayServicesBrightnessObserver { id, value in
+            settings.onChange = { config in
+                // Turning off is logged before the file closes.
+                if config.debug { debug.setEnabled(true) }
+                debug.log("config changed: \(config)")
+                if !config.debug { debug.setEnabled(false) }
+                sync.setMode(config.sync)
+                server.broadcast(.configChanged(config))
+            }
+            sync.setMode(settings.config.sync)
+
+            let observer = DisplayServicesBrightnessObserver(log: { debug.log($0) }) { id, value in
                 DispatchQueue.main.async {
                     let percent = Percent.fromDevice(value)
+                    debug.log("notification \(id) value \(value) -> \(percent)%")
                     server.broadcast(.brightnessChanged(id: id, percent: percent))
                     MainActor.assumeIsolated { sync.brightnessChanged(id: id, percent: percent) }
                 }
@@ -70,20 +86,33 @@ struct MBrightD: ParsableCommand {
             let observeAll: @MainActor () -> Void = {
                 observer.observe((try? enumerator.onlineDisplays())?.map(\.id) ?? [])
             }
+            let logReadings: @MainActor (String) -> Void = { tag in
+                guard debug.isEnabled else { return }
+                do {
+                    let readings = try controller.readings()
+                    debug.log("\(tag): \(Describe.readings(readings))")
+                } catch {
+                    debug.log("\(tag): readings failed: \(error)")
+                }
+            }
 
-            DisplayWatcher.start {
+            DisplayWatcher.start(log: { debug.log($0) }) {
+                debug.log("displays settled after \(DisplayWatcher.settleDelay)s")
+                logReadings("displays")
                 observeAll()
                 sync.displaysChanged()
                 server.broadcast(.displaysChanged)
             }
-            SignalHandler.install { Shutdown.perform() }
+            SignalHandler.install { debug.log("signal"); Shutdown.perform() }
 
             do {
                 try server.start()
             } catch {
                 FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
+                debug.log("could not start server: \(error)")
                 Darwin.exit(1)
             }
+            logReadings("start")
             observeAll()
 
             // A prohibited-policy NSApplication has no Dock icon or UI, but
@@ -109,23 +138,26 @@ enum DaemonProbe {
 @MainActor
 final class DisplayWatcher {
     static var shared: DisplayWatcher?
-    private static let settleDelay: TimeInterval = 0.3
+    static let settleDelay: TimeInterval = 0.3
 
     private let onChange: @MainActor () -> Void
+    private let log: @MainActor (String) -> Void
     private var pending: DispatchWorkItem?
 
-    private init(onChange: @escaping @MainActor () -> Void) {
+    private init(log: @escaping @MainActor (String) -> Void, onChange: @escaping @MainActor () -> Void) {
+        self.log = log
         self.onChange = onChange
     }
 
-    static func start(onChange: @escaping @MainActor () -> Void) {
-        shared = DisplayWatcher(onChange: onChange)
-        CGDisplayRegisterReconfigurationCallback({ _, _, _ in
-            MainActor.assumeIsolated { DisplayWatcher.shared?.schedule() }
+    static func start(log: @escaping @MainActor (String) -> Void, onChange: @escaping @MainActor () -> Void) {
+        shared = DisplayWatcher(log: log, onChange: onChange)
+        CGDisplayRegisterReconfigurationCallback({ id, flags, _ in
+            MainActor.assumeIsolated { DisplayWatcher.shared?.schedule(id: id, flags: flags) }
         }, nil)
     }
 
-    private func schedule() {
+    private func schedule(id: CGDirectDisplayID, flags: CGDisplayChangeSummaryFlags) {
+        log("reconfiguration callback: display \(id) flags 0x\(String(flags.rawValue, radix: 16))")
         pending?.cancel()
         let item = DispatchWorkItem { [onChange] in
             MainActor.assumeIsolated { onChange() }

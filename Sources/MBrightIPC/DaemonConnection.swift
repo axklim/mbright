@@ -24,6 +24,8 @@ public final class DaemonConnection {
 
     public var onEvent: (@MainActor (Event) -> Void)?
     public var onDisconnect: (@MainActor (String) -> Void)?
+    /// Runs after every successful connect, before the waiting sends.
+    public var onConnect: (@MainActor () -> Void)?
 
     public init(path: String = SocketPath.resolve()) {
         self.path = path
@@ -100,6 +102,7 @@ public final class DaemonConnection {
                 switch result {
                 case let .success(fd):
                     self.attach(fd)
+                    self.onConnect?()
                     if self.subscribed {
                         let id = self.nextID
                         self.nextID += 1

@@ -21,8 +21,10 @@ import Testing
 
 @Test func relevantEnvironmentKeepsOnlyValidXDGDirs() {
     #expect(LaunchAgent.relevantEnvironment([
-        "XDG_RUNTIME_DIR": "/run/user/501", "XDG_CONFIG_HOME": "/h/.config", "PATH": "/bin", "HOME": "/h",
-    ]) == ["XDG_RUNTIME_DIR": "/run/user/501", "XDG_CONFIG_HOME": "/h/.config"])
+        "XDG_RUNTIME_DIR": "/run/user/501", "XDG_CONFIG_HOME": "/h/.config", "XDG_STATE_HOME": "/h/.state",
+        "PATH": "/bin", "HOME": "/h",
+    ]) == ["XDG_RUNTIME_DIR": "/run/user/501", "XDG_CONFIG_HOME": "/h/.config", "XDG_STATE_HOME": "/h/.state"])
+    #expect(LaunchAgent.relevantEnvironment(["XDG_STATE_HOME": "rel"]) == [:])
     #expect(LaunchAgent.relevantEnvironment(["XDG_RUNTIME_DIR": "/run/user/501"])
         == ["XDG_RUNTIME_DIR": "/run/user/501"])
     #expect(LaunchAgent.relevantEnvironment(["XDG_CONFIG_HOME": "/h/.config"])

@@ -50,6 +50,7 @@ private func roundTrip<T: Codable & Equatable>(_ value: T) throws -> T {
         .reply(id: 11, response: .failure(.configInvalid(path: "/c.json", reason: "r"))),
         .event(.displaysChanged),
         .event(.brightnessChanged(id: 3, percent: 42)),
+        .event(.configChanged(Config(sync: .full, debug: true))),
     ]
     for message in messages {
         #expect(try roundTrip(message) == message)

@@ -16,6 +16,12 @@ func syncLine(_ config: Config) -> String {
     }
 }
 
+func debugLine(_ config: Config) -> String {
+    guard config.debug else { return "debug: off" }
+    let directory = DebugLog.resolve(name: "mbrightd").deletingLastPathComponent().path
+    return "debug: on, logs in \(abbreviated(directory))/"
+}
+
 func abbreviated(_ path: String) -> String { (path as NSString).abbreviatingWithTildeInPath }
 
 func describe(_ status: ConfigStatus) -> String {
@@ -25,6 +31,7 @@ func describe(_ status: ConfigStatus) -> String {
         \(loginLine(status.config))
         ui: \(status.config.ui ? "menu bar app" : "mbrightd only")
         \(syncLine(status.config))
+        \(debugLine(status.config))
         """
 }
 

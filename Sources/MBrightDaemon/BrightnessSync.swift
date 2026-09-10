@@ -17,27 +17,39 @@ public final class BrightnessSync {
 
     private let controller: BrightnessController
     private let log: (String) -> Void
+    private let debug: (String) -> Void
     private var main: (id: CGDirectDisplayID, percent: Int)?
 
-    public init(controller: BrightnessController, log: @escaping (String) -> Void) {
+    public init(
+        controller: BrightnessController,
+        debug: @escaping (String) -> Void = { _ in },
+        log: @escaping (String) -> Void
+    ) {
         self.controller = controller
         self.log = log
+        self.debug = debug
         main = readMain()
     }
 
     public func setMode(_ new: SyncMode) {
         mode = new
+        debug("sync: mode \(new.rawValue), main \(describeMain())")
         snap()
     }
 
     public func displaysChanged() {
         main = readMain()
+        debug("sync: displays changed, main \(describeMain())")
         snap()
     }
 
     public func brightnessChanged(id: CGDirectDisplayID, percent: Int) {
-        guard let current = main, id == current.id, percent != current.percent else { return }
+        guard let current = main, id == current.id, percent != current.percent else {
+            debug("sync: notification \(id)=\(percent)% ignored, main \(describeMain())")
+            return
+        }
         main = (id, percent)
+        debug("sync: main changed elsewhere \(current.percent)% -> \(percent)%")
         do {
             try propagate(from: current.percent, to: percent)
         } catch {
@@ -91,14 +103,23 @@ public final class BrightnessSync {
         // A main that cannot be read back keeps its old value; the write's
         // own error already covers that display.
         guard written.contains(where: { $0.id == current.id }),
-              let now = try? controller.get(.id(current.id)) else { return }
+              let now = try? controller.get(.id(current.id)) else {
+            debug("sync: wrote \(written.map(\.id)), main not among them or unreadable")
+            return
+        }
         main = (current.id, now)
-        guard written.count == 1 else { return }
+        guard written.count == 1 else {
+            debug("sync: wrote every display, main now \(now)%, no propagation")
+            return
+        }
         try propagate(from: current.percent, to: now)
     }
 
     private func snap() {
-        guard mode == .full, let current = main else { return }
+        guard mode == .full, let current = main else {
+            debug("sync: snap skipped, mode \(mode.rawValue), main \(describeMain())")
+            return
+        }
         do {
             try propagate(from: current.percent, to: current.percent)
         } catch {
@@ -109,9 +130,13 @@ public final class BrightnessSync {
     private func propagate(from previous: Int, to now: Int) throws {
         guard let current = main, mode != .off else { return }
         if mode == .relative, now == previous { return }
+        debug("sync: propagate \(mode.rawValue) \(previous)% -> \(now)% from main \(current.id)")
         var failures: [String] = []
-        for reading in try controller.readings()
-        where reading.display.id != current.id && reading.state != .unsupported {
+        for reading in try controller.readings() where reading.display.id != current.id {
+            guard reading.state != .unsupported else {
+                debug("sync: skip \(reading.display.name) (\(reading.display.id)), no brightness control")
+                continue
+            }
             let target = Target.id(reading.display.id)
             do {
                 if mode == .full {
@@ -119,13 +144,19 @@ public final class BrightnessSync {
                 } else {
                     try controller.adjust(delta: now - previous, target: target)
                 }
+                debug("sync: wrote \(reading.display.name) (\(reading.display.id)) ok")
             } catch MBrightError.partialFailure(let list) {
                 failures += list
             } catch {
                 failures.append("\(reading.display.name): \(error)")
             }
         }
+        if !failures.isEmpty { debug("sync: failures \(failures)") }
         guard failures.isEmpty else { throw MBrightError.partialFailure(failures: failures) }
+    }
+
+    private func describeMain() -> String {
+        main.map { "\($0.id)=\($0.percent)%" } ?? "none"
     }
 
     private func readMain() -> (id: CGDirectDisplayID, percent: Int)? {

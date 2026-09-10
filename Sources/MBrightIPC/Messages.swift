@@ -40,6 +40,9 @@ public enum Event: Equatable, Sendable, Codable {
     /// A display's brightness changed, by anyone: a CLI write, System
     /// Settings, a keyboard key, or the display's own auto-brightness.
     case brightnessChanged(id: CGDirectDisplayID, percent: Int)
+    /// The daemon's config changed, by a `setConfig` or `reloadConfig`
+    /// from any client.
+    case configChanged(Config)
 }
 
 public struct ClientMessage: Equatable, Sendable, Codable {

@@ -14,6 +14,7 @@ struct MBright: ParsableCommand {
             UpCommand.self,
             DownCommand.self,
             SyncCommand.self,
+            DebugCommand.self,
             DaemonCommand.self,
             ConfigCommand.self,
         ],

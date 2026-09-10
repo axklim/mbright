@@ -1,4 +1,5 @@
 import Foundation
+import MBrightCore
 import MBrightIPC
 
 /// The one LaunchAgent mbright writes. Only written or removed, never
@@ -27,8 +28,9 @@ public struct LaunchAgent: Equatable, Sendable {
     }
 
     /// The subset of `environment` that changes where mbright puts files:
-    /// the runtime dir for the socket and the config dir for the config
-    /// file, each pinned only when set to a valid (non-empty, absolute) path.
+    /// the runtime dir for the socket, the config dir for the config file
+    /// and the state dir for the debug log, each pinned only when set to a
+    /// valid (non-empty, absolute) path.
     public static func relevantEnvironment(_ environment: [String: String]) -> [String: String] {
         var result: [String: String] = [:]
         if let runtime = SocketPath.xdgDirectory(environment[SocketPath.xdgRuntimeVariable]) {
@@ -36,6 +38,9 @@ public struct LaunchAgent: Equatable, Sendable {
         }
         if let config = SocketPath.xdgDirectory(environment[ConfigFile.xdgConfigVariable]) {
             result[ConfigFile.xdgConfigVariable] = config
+        }
+        if let state = SocketPath.xdgDirectory(environment[DebugLog.xdgStateVariable]) {
+            result[DebugLog.xdgStateVariable] = state
         }
         return result
     }

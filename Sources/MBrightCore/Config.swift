@@ -14,20 +14,24 @@ public struct Config: Equatable, Sendable, Codable {
     public var login: Bool
     public var ui: Bool
     public var sync: SyncMode
+    /// Writes a debug log under `$XDG_STATE_HOME/mbright/`.
+    public var debug: Bool
 
-    public init(login: Bool = false, ui: Bool = true, sync: SyncMode = .off) {
+    public init(login: Bool = false, ui: Bool = true, sync: SyncMode = .off, debug: Bool = false) {
         self.login = login
         self.ui = ui
         self.sync = sync
+        self.debug = debug
     }
 
-    private enum CodingKeys: String, CodingKey { case login, ui, sync }
+    private enum CodingKeys: String, CodingKey { case login, ui, sync, debug }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         login = try container.decodeIfPresent(Bool.self, forKey: .login) ?? false
         ui = try container.decodeIfPresent(Bool.self, forKey: .ui) ?? true
         sync = try container.decodeIfPresent(SyncMode.self, forKey: .sync) ?? .off
+        debug = try container.decodeIfPresent(Bool.self, forKey: .debug) ?? false
     }
 }
 

@@ -88,6 +88,7 @@ ServerMessage = reply(id, response) | event(event)
 Response      = readings([DisplayReading]) | percent | ok | version | failure(MBrightError)
               | config(ConfigStatus)
 Event         = displaysChanged | brightnessChanged(id, percent)
+              | configChanged(config)
 ```
 
 `Target` has a `.id(CGDirectDisplayID)` case for clients that already hold
@@ -114,6 +115,33 @@ refreshes on every menu open.
 
 The daemon also feeds every brightness notification to `BrightnessSync`
 (below), after broadcasting it.
+
+Config: the daemon broadcasts `configChanged` after every successful
+`setConfig` or `reloadConfig`, so the menu bar app follows a `mbright
+debug on` typed in a terminal.
+
+## Debug log
+
+`debug` in the config turns on an append-only text log per process,
+`DebugLog` in `MBrightCore`: `mbrightd.log` for the daemon and
+`mbright-menubar.log` for the menu bar app, both under
+`$XDG_STATE_HOME/mbright/`. The daemon reads the key at start and on
+every config change; the menu bar app asks for the config on every
+connect and follows `configChanged`. Off costs nothing: messages are
+autoclosures and the file is not opened. A file that cannot be opened
+leaves the log off rather than failing the process.
+
+The daemon logs every request with its reply, every CoreGraphics
+reconfiguration callback with its flags, the readings it takes when the
+burst settles, observer registrations with their return codes, every
+brightness notification, and every sync decision including why a
+display was skipped. The menu bar app logs connects and disconnects,
+events, readings replies, menu rebuilds (views reused or recreated, rows
+without a slider), and every set it sends. The log exists because
+DisplayServices reports a display that has just reconnected as having
+no brightness control for a few seconds, and both processes act 300 ms
+after the last callback; the log shows what each side saw at that
+moment.
 
 ## Brightness sync
 
@@ -145,7 +173,8 @@ forgets the lost part of a delta.
 | File | Location |
 | --- | --- |
 | Socket | `$XDG_RUNTIME_DIR/mbright/mbrightd.sock` |
-| Config | `$XDG_CONFIG_HOME/mbright/config.json` (`{"login": false, "ui": true, "sync": "off"}` by default; only mbrightd writes it) |
+| Config | `$XDG_CONFIG_HOME/mbright/config.json` (`{"login": false, "ui": true, "sync": "off", "debug": false}` by default; only mbrightd writes it) |
+| Debug log | `$XDG_STATE_HOME/mbright/mbrightd.log` and `mbright-menubar.log` (default `~/.local/state`), only when `debug` is on |
 | LaunchAgent plist | `~/Library/LaunchAgents/com.axklim.mbright.plist` (launchd reads nowhere else) |
 | Install (`make install`) | `~/Applications/mbright.app`: clients in `Contents/MacOS`, `mbrightd` in `Contents/Helpers`; `~/.local/bin/mbright` symlinks into it |
 
@@ -157,8 +186,8 @@ fallback warning is deliberately not printed, since on macOS the fallback
 is the normal path.
 
 launchd does not inherit the shell environment, so `enable-login` pins
-the `XDG_RUNTIME_DIR` and `XDG_CONFIG_HOME` in force (when set) into the
-plist's `EnvironmentVariables`. At start and on reload the daemon keeps
+the `XDG_RUNTIME_DIR`, `XDG_CONFIG_HOME` and `XDG_STATE_HOME` in force
+(when set) into the plist's `EnvironmentVariables`. At start and on reload the daemon keeps
 whatever the plist already pins, so a daemon started from a terminal with
 a scratch runtime dir or config dir does not move the login socket or
 config file.

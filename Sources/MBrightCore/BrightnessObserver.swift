@@ -21,14 +21,16 @@ public final class DisplayServicesBrightnessObserver: @unchecked Sendable {
     private let lock = NSLock()
     private var observed: Set<CGDirectDisplayID> = []
     private let handler: Handler
+    private let log: @Sendable (String) -> Void
 
     /// The C callback cannot capture context, so live observers are looked
     /// up here by the display ID DisplayServices hands back.
     nonisolated(unsafe) private static var registry: [CGDirectDisplayID: DisplayServicesBrightnessObserver] = [:]
     private static let registryLock = NSLock()
 
-    public init(handler: @escaping Handler) {
+    public init(log: @escaping @Sendable (String) -> Void = { _ in }, handler: @escaping Handler) {
         self.handler = handler
+        self.log = log
         let handle = dlopen(DisplayServicesBackend.frameworkPath, RTLD_LAZY)
         registerFn = handle.flatMap { dlsym($0, "DisplayServicesRegisterForBrightnessChangeNotifications") }
             .map { unsafeBitCast($0, to: RegisterFn.self) }
@@ -51,14 +53,18 @@ public final class DisplayServicesBrightnessObserver: @unchecked Sendable {
 
         for id in removed {
             Self.registryLock.withLock { _ = Self.registry.removeValue(forKey: id) }
-            _ = unregisterFn(id, id)
+            let code = unregisterFn(id, id)
+            log("observer: unregister \(id) -> \(code)")
         }
         for id in added {
             Self.registryLock.withLock { Self.registry[id] = self }
-            if registerFn(id, id, Self.callback) != 0 {
+            let code = registerFn(id, id, Self.callback)
+            log("observer: register \(id) -> \(code)")
+            if code != 0 {
                 Self.registryLock.withLock { _ = Self.registry.removeValue(forKey: id) }
             }
         }
+        if added.isEmpty, removed.isEmpty { log("observer: observing \(wanted.sorted()), nothing to change") }
     }
 
     private static let callback: CFNotificationCallback = { _, observer, _, _, userInfo in

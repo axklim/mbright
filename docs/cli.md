@@ -7,6 +7,7 @@ mbright set <0-100> [-d <sel>|--all]
 mbright up [<delta>] [-d <sel>|--all]     default 10, clamped at 100
 mbright down [<delta>] [-d <sel>|--all]   default 10, clamped at 0
 mbright sync [off|full|relative]     other displays follow the main display
+mbright debug [on|off]               write debug logs
 mbright daemon start|stop|status
 mbright daemon enable-login [--no-ui]   start at login; --no-ui starts mbrightd alone
 mbright daemon disable-login
@@ -61,6 +62,18 @@ keyboard keys, System Settings, or auto-brightness. `set`, `up` and
 `down` with `--all` write every display once; sync does not add to
 that. A failed write to a secondary is reported the way `--all` reports
 one.
+
+## debug
+
+Without an argument prints the state. With one, saves it to the config
+and prints the result. When on, `mbrightd` writes `mbrightd.log` and the
+menu bar app writes `mbright-menubar.log` under
+`$XDG_STATE_HOME/mbright/` (`~/.local/state/mbright/` by default). Both
+react at once; no restart. The files are append-only and never rotated,
+so turn it off when done. What they contain: every request and reply,
+every display reconfiguration callback and what the displays reported
+after it settled, brightness notifications, sync decisions, and the menu
+bar app's readings and menu rebuilds.
 
 ## Selecting a display: `--display` / `-d`
 

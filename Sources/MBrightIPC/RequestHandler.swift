@@ -25,7 +25,7 @@ public struct RequestHandler: Sendable {
             case let .adjust(delta, target):
                 try controller.adjust(delta: delta, target: target)
                 return .ok
-            case .subscribe, .shutdown, .config, .setConfig, .reloadConfig, .writeConfig:
+            case .subscribe, .shutdown, .config, .setConfig, .reloadConfig, .writeConfig, .updateConfig:
                 return .ok
             case .version:
                 return .version(version)

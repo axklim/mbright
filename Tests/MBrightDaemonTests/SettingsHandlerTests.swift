@@ -169,6 +169,53 @@ private struct Sandbox {
     #expect(LaunchAgent.read(at: box.agentURL) == nil)
 }
 
+@MainActor @Test func updateConfigKeepsSetKeysAddsMissingOnesAndDropsUnknownOnes() throws {
+    let box = Sandbox("settings")
+    defer { box.remove() }
+    let handler = box.handler()
+    handler.start()
+    try Data(#"{"sync": "relative", "hotkeys": [], "retired": 1}"#.utf8).write(to: box.file.url)
+    var changes: [Config] = []
+    handler.onChange = { changes.append($0) }
+
+    let expected = Config(sync: .relative, hotkeys: [])
+    #expect(handler.handle(.updateConfig) == .config(ConfigStatus(config: expected, path: box.file.path, onDisk: true)))
+    #expect(handler.config == expected)
+    #expect(changes == [expected])
+
+    let object = try JSONSerialization.jsonObject(with: Data(contentsOf: box.file.url)) as? [String: Any]
+    #expect(object?.keys.sorted() == ["debug", "hotkeys", "login", "sync", "ui"])
+    #expect(object?["sync"] as? String == "relative")
+    #expect((object?["hotkeys"] as? [Any])?.isEmpty == true)
+    #expect(object?["login"] as? Bool == false)
+}
+
+@MainActor @Test func updateConfigWithNoFileWritesTheCurrentConfig() throws {
+    let box = Sandbox("settings")
+    defer { box.remove() }
+    let handler = box.handler()
+    handler.start()
+    #expect(handler.handle(.setConfig(Config(sync: .full))) == .config(ConfigStatus(config: Config(sync: .full), path: box.file.path, onDisk: true)))
+    try FileManager.default.removeItem(at: box.file.url)
+    #expect(handler.handle(.updateConfig) == .config(ConfigStatus(config: Config(sync: .full), path: box.file.path, onDisk: true)))
+    #expect(try box.file.load() == Config(sync: .full))
+}
+
+@MainActor @Test func updateConfigWithMalformedFileFailsAndWritesNothing() throws {
+    let box = Sandbox("settings")
+    defer { box.remove() }
+    let handler = box.handler()
+    handler.start()
+    try Data("{".utf8).write(to: box.file.url)
+    let response = handler.handle(.updateConfig)
+    guard case let .failure(error) = response, case .configInvalid = error else {
+        Issue.record("expected configInvalid, got \(String(describing: response))")
+        return
+    }
+    #expect(handler.config == Config())
+    #expect(try String(contentsOf: box.file.url, encoding: .utf8) == "{")
+}
+
 @MainActor @Test func nonConfigRequestsAreNotHandled() {
     let box = Sandbox("settings")
     defer { box.remove() }

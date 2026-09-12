@@ -15,7 +15,8 @@ make install     # ~/Applications/mbright.app + ~/.local/bin/mbright
 make uninstall
 ```
 
-`make install` also launches the menu bar app; afterwards it is in
+`make install` also updates an existing config file to this version's
+keys (`mbright config update`) and launches the menu bar app; afterwards it is in
 Spotlight and Raycast like any app. `~/.local/bin` must be on your `PATH`
 for the CLI (`make install PREFIX=/usr/local` puts the symlink elsewhere).
 

@@ -44,7 +44,8 @@ at start (defaults when missing, a stderr warning when malformed) and is
 the only process that writes it. The `login` and `ui` keys drive one
 LaunchAgent plist, `com.axklim.mbright`, that starts either the menu bar
 app (which starts the daemon, as always) or `mbrightd` alone. The daemon
-reconciles the plist with the config on `reloadConfig`, on every
+reconciles the plist with the config on `reloadConfig`, `updateConfig`
+(a reload that then rewrites the file in this version's shape), on every
 `setConfig`, and at start when a config file loaded; with no config file
 the daemon leaves the plist alone at start. It never bootstraps the
 plist, and the plist has no `KeepAlive`, so Quit or `daemon
@@ -85,6 +86,7 @@ ClientMessage { id, request }
 Request       = readings | get(target) | set(percent, target)
               | adjust(delta, target) | subscribe | version | shutdown
               | config | setConfig(config) | reloadConfig | writeConfig
+              | updateConfig
 ServerMessage = reply(id, response) | event(event)
 Response      = readings([DisplayReading]) | percent | ok | version | failure(MBrightError)
               | config(ConfigStatus)

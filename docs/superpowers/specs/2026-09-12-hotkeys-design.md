@@ -152,8 +152,13 @@ main; with one display it is `noMatch`. `BrightnessSync` needs nothing
 new: `.adjust` on a secondary is already a non-main write.
 
 `mbright config show` and `config reload` print one `hotkeys:` line per
-binding (`hotkeys: off` for an empty list). No new CLI command: shortcuts
-are edited in the file.
+binding (`hotkeys: off` for an empty list). No CLI command edits
+shortcuts; they are edited in the file. Two commands help a file written
+by an older version: `config init --force` overwrites it with the
+defaults (a `setConfig(Config())`, so the daemon applies them, login
+included), and `config update` sends the new `updateConfig` request,
+a reload followed by a save, so set keys keep their values, keys this
+version added get their defaults, and unknown keys are dropped.
 
 ### Permission and signing
 

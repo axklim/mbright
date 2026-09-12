@@ -12,7 +12,8 @@ mbright daemon start|stop|status
 mbright daemon enable-login [--no-ui]   start at login; --no-ui starts mbrightd alone
 mbright daemon disable-login
 mbright config [show]                   config path and current settings
-mbright config init                     write the file from current settings
+mbright config init [--force]           write the file from current settings; --force resets to defaults
+mbright config update                   rewrite the file for this version, keeping set keys
 mbright config reload                   re-read a hand-edited file
 ```
 
@@ -136,9 +137,15 @@ hotkeys:
   ropt+shift+f2  secondary up 20
 ```
 
-`config init` writes that file once and never overwrites it. `config
-reload` re-reads it after a hand edit and prints the same block; a
-malformed file is an error and the daemon keeps its previous settings.
+`config init` writes that file once and never overwrites it; `config init
+--force` overwrites it with the defaults and applies them, which also
+turns launch at login off. `config update` rewrites the file for the
+installed version: keys you have set keep their values, keys this
+version added appear with their defaults, and keys it no longer knows
+are dropped; it picks up hand edits first and prints the same block.
+`config reload` re-reads it after a hand edit and prints the same block;
+a malformed file is an error for both and the daemon keeps its previous
+settings.
 Only `mbrightd` touches the file, so every config command needs a running
 daemon or `--daemon-autostart`.
 

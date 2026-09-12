@@ -44,7 +44,8 @@ at start (defaults when missing, a stderr warning when malformed) and is
 the only process that writes it. The `login` and `ui` keys drive one
 LaunchAgent plist, `com.axklim.mbright`, that starts either the menu bar
 app (which starts the daemon, as always) or `mbrightd` alone. The daemon
-reconciles the plist with the config on `reloadConfig`, on every
+reconciles the plist with the config on `reloadConfig`, `updateConfig`
+(a reload that then rewrites the file in this version's shape), on every
 `setConfig`, and at start when a config file loaded; with no config file
 the daemon leaves the plist alone at start. It never bootstraps the
 plist, and the plist has no `KeepAlive`, so Quit or `daemon
@@ -56,7 +57,8 @@ plist.
 **`mbright-menubar`** is a view. It never touches displays. It spawns the
 daemon if none is running, subscribes to events, rebuilds its menu on open
 and on hotplug, and its sliders follow brightness changes while the menu is
-open. It is a bare executable; the `.app` bundle `make install` writes is
+open. It also listens for the keyboard shortcuts in the config (below) and
+turns each press into an `adjust` request. It is a bare executable; the `.app` bundle `make install` writes is
 only a directory with an `Info.plist` around it, since the project builds
 with Command Line Tools only. That rules out `SMAppService`, so Launch at
 login is a LaunchAgent plist in `~/Library/LaunchAgents`, written by the
@@ -66,10 +68,10 @@ daemon from its config.
 
 | Target | Responsibility |
 | --- | --- |
-| `MBrightCore` | `BrightnessController`, `DisplaySelector`, `Percent`, display enumeration, the `dlopen` backend, the brightness change observer |
+| `MBrightCore` | `BrightnessController`, `DisplaySelector`, `Percent`, display enumeration, the `dlopen` backend, the brightness change observer, `Config`, `Hotkey` and `KeyCombination` |
 | `MBrightIPC` | Wire messages, JSON-lines codec, Unix socket server and clients, daemon launcher |
 | `MBrightDaemon` | Config file, LaunchAgent plist, bundle detection, login reconcile, `SettingsHandler`, `BrightnessSync` |
-| `MBrightMenuBar` | AppKit: status item, slider views, Settings window |
+| `MBrightMenuBar` | AppKit: status item, slider views, Settings window, `HotkeyListener` |
 
 Hardware sits behind two protocols, `DisplayEnumerating` and
 `BrightnessBackend`. Everything above them is tested against fakes.
@@ -84,6 +86,7 @@ ClientMessage { id, request }
 Request       = readings | get(target) | set(percent, target)
               | adjust(delta, target) | subscribe | version | shutdown
               | config | setConfig(config) | reloadConfig | writeConfig
+              | updateConfig
 ServerMessage = reply(id, response) | event(event)
 Response      = readings([DisplayReading]) | percent | ok | version | failure(MBrightError)
               | config(ConfigStatus)
@@ -92,7 +95,8 @@ Event         = displaysChanged | brightnessChanged(id, percent)
 ```
 
 `Target` has a `.id(CGDirectDisplayID)` case for clients that already hold
-an ID; the CLI never produces it.
+an ID and a `.secondary` case for the first online display that is not
+main; the CLI produces neither.
 
 Accepted connections are non-blocking. A client that stops draining its
 socket is dropped once a write would block, rather than stranding the main
@@ -143,6 +147,36 @@ no brightness control for a few seconds, and both processes act 300 ms
 after the last callback; the log shows what each side saw at that
 moment.
 
+## Keyboard shortcuts
+
+`hotkeys` in the config is a list of bindings; the default is Left Option
++ F1/F2 for the main display and Right Option + F1/F2 for the secondary
+one, 5 points per press, and the same with Shift for 20. The menu bar app owns them: `HotkeyListener`
+installs one session-level `CGEventTap` for `keyDown`, matches the key
+code and the modifier flags against the list, sends `.adjust(delta,
+target)` for a hit and swallows the event so the system does not act on
+it too. Holding a key repeats. One adjust is in flight at a time; presses
+that arrive meanwhile are summed per target and sent when the reply
+comes back. The list is taken from the daemon's config on every connect
+and follows `configChanged`, so `mbright config reload` re-registers
+shortcuts without a restart; an empty list removes the tap.
+
+Left and right Option are told apart by the device-side modifier bits
+CoreGraphics sets on real key presses (`NX_DEVICELALTKEYMASK` and
+friends). Carbon's `RegisterEventHotKey` cannot see those, which is why
+an event tap is used even though it needs Accessibility access. Without
+that access the tap cannot be created: the app asks once with the
+system prompt, shows the state in Settings with a button to the
+Accessibility pane, and retries every few seconds until granted. The
+binary is only ad-hoc signed, so the grant is tied to that exact build
+and has to be given again after `make install` of a new one. While
+secure keyboard entry is on (the lock screen, a password field,
+Terminal's Secure Keyboard Entry) no tap receives keys, so shortcuts
+pause; that is macOS, not mbright.
+
+Parsing, matching and the config coding live in `MBrightCore` and are
+unit tested; the tap itself needs the window server and is not.
+
 ## Brightness sync
 
 `sync` in the config is `off`, `full` (other displays are set to main's
@@ -173,7 +207,7 @@ forgets the lost part of a delta.
 | File | Location |
 | --- | --- |
 | Socket | `$XDG_RUNTIME_DIR/mbright/mbrightd.sock` |
-| Config | `$XDG_CONFIG_HOME/mbright/config.json` (`{"login": false, "ui": true, "sync": "off", "debug": false}` by default; only mbrightd writes it) |
+| Config | `$XDG_CONFIG_HOME/mbright/config.json` (`{"login": false, "ui": true, "sync": "off", "debug": false, "hotkeys": [...]}` by default, see `docs/cli.md` for the hotkey format; only mbrightd writes it) |
 | Debug log | `$XDG_STATE_HOME/mbright/mbrightd.log` and `mbright-menubar.log` (default `~/.local/state`), only when `debug` is on |
 | LaunchAgent plist | `~/Library/LaunchAgents/com.axklim.mbright.plist` (launchd reads nowhere else) |
 | Install (`make install`) | `~/Applications/mbright.app`: clients in `Contents/MacOS`, `mbrightd` in `Contents/Helpers`; `~/.local/bin/mbright` symlinks into it |

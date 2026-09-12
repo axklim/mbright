@@ -22,6 +22,11 @@ func debugLine(_ config: Config) -> String {
     return "debug: on, logs in \(abbreviated(directory))/"
 }
 
+func hotkeysLines(_ config: Config) -> String {
+    guard !config.hotkeys.isEmpty else { return "hotkeys: off" }
+    return "hotkeys:\n" + config.hotkeys.map { "  \($0)" }.joined(separator: "\n")
+}
+
 func abbreviated(_ path: String) -> String { (path as NSString).abbreviatingWithTildeInPath }
 
 func describe(_ status: ConfigStatus) -> String {
@@ -32,6 +37,7 @@ func describe(_ status: ConfigStatus) -> String {
         ui: \(status.config.ui ? "menu bar app" : "mbrightd only")
         \(syncLine(status.config))
         \(debugLine(status.config))
+        \(hotkeysLines(status.config))
         """
 }
 
@@ -83,7 +89,7 @@ struct ConfigCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "config",
         abstract: "Show, create, or reload the config file.",
-        subcommands: [ConfigShow.self, ConfigInit.self, ConfigReload.self],
+        subcommands: [ConfigShow.self, ConfigInit.self, ConfigUpdate.self, ConfigReload.self],
         defaultSubcommand: ConfigShow.self
     )
 }
@@ -107,17 +113,38 @@ struct ConfigInit: ParsableCommand {
         abstract: "Write the config file from the current settings, if it does not exist."
     )
 
+    @Flag(name: .long, help: "Overwrite the file with the defaults and apply them, login included.")
+    var force = false
+
     @OptionGroup var daemon: DaemonOptions
 
     func run() throws {
+        if force {
+            let status = try configStatus(.setConfig(Config()), autostart: daemon.daemonAutostart)
+            print("wrote \(abbreviated(status.path)) with the defaults")
+            return
+        }
         let before = try configStatus(.config, autostart: daemon.daemonAutostart)
         let path = abbreviated(before.path)
         guard !before.onDisk else {
-            print("\(path) already exists")
+            print("\(path) already exists; 'config init --force' overwrites it with the defaults")
             return
         }
         _ = try configStatus(.writeConfig, autostart: daemon.daemonAutostart)
         print("wrote \(path)")
+    }
+}
+
+struct ConfigUpdate: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "update",
+        abstract: "Rewrite the file for this version: keep set keys, add new ones with defaults, drop unknown ones."
+    )
+
+    @OptionGroup var daemon: DaemonOptions
+
+    func run() throws {
+        print(describe(try configStatus(.updateConfig, autostart: daemon.daemonAutostart)))
     }
 }
 

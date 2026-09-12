@@ -16,6 +16,7 @@ enum Describe {
         case let .setConfig(config): return "setConfig \(config)"
         case .reloadConfig: return "reloadConfig"
         case .writeConfig: return "writeConfig"
+        case .updateConfig: return "updateConfig"
         }
     }
 
@@ -46,6 +47,7 @@ enum Describe {
         switch target {
         case .all: return "all"
         case .main: return "main"
+        case .secondary: return "secondary"
         case let .selector(selector): return "'\(selector)'"
         case let .id(id): return "id \(id)"
         }

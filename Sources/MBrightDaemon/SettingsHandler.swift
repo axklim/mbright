@@ -73,6 +73,8 @@ public final class SettingsHandler {
             return respond { try reload() }
         case .writeConfig:
             return respond { if !file.exists { try file.save(config) } }
+        case .updateConfig:
+            return respond { try update() }
         default:
             return nil
         }
@@ -103,6 +105,17 @@ public final class SettingsHandler {
         config = try file.load() ?? Config()
         onChange?(config)
         try reconcile(.start, orReport: "config reloaded from \(file.path)")
+    }
+
+    /// A reload followed by a save: decoding fills missing keys with their
+    /// defaults and ignores unknown ones, so the rewritten file is the
+    /// user's values in this version's shape. A malformed file fails
+    /// before anything is written.
+    private func update() throws {
+        config = try file.load() ?? config
+        try file.save(config)
+        onChange?(config)
+        try reconcile(.start, orReport: "config updated at \(file.path)")
     }
 
     /// The config is already saved/reloaded by the time this runs, so a

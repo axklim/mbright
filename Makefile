@@ -127,7 +127,12 @@ clean: ## Remove build products (fetched dependencies are kept)
 # The bundle is ad-hoc signed, so every build is a new binary to TCC and a
 # stale Accessibility grant would show as allowed while the hotkey tap is
 # refused. Dropping it makes the app ask again on launch.
-install: build-release ## Build, stop anything running, install the app bundle, launch it
+#
+# `config update` brings a config file from an older version into this
+# one's shape: set keys stay, new keys get their defaults, unknown keys go.
+# It needs a daemon, so the installed CLI starts the installed one, which
+# the app then finds running. A failure here is reported, not fatal.
+install: build-release ## Build, stop anything running, install the app bundle, update the config, launch it
 	@$(call stop,$(BUILD_DIR)/release,$(APP_HELPERS))
 	@mkdir -p "$(APP_BIN)" "$(APP_HELPERS)" "$(BINDIR)"
 	@for b in $(CLIENTS); do \
@@ -140,6 +145,8 @@ install: build-release ## Build, stop anything running, install the app bundle, 
 	@tccutil reset Accessibility $(BUNDLE_ID) >/dev/null 2>&1 || true
 	@echo "installed $(APP)"
 	@echo "installed $(BINDIR)/mbright -> $(APP_BIN)/mbright"
+	@"$(APP_BIN)/mbright" config update --daemon-autostart \
+	  || echo "warning: could not update the config file; run 'mbright config update' by hand"
 	@open -a "$(APP)"
 
 # Only a symlink that points into the bundle is ours to remove. The

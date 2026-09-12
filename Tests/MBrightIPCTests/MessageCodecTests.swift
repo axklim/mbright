@@ -24,6 +24,7 @@ private func roundTrip<T: Codable & Equatable>(_ value: T) throws -> T {
         ClientMessage(id: 10, request: .setConfig(Config(login: true, ui: false))),
         ClientMessage(id: 11, request: .reloadConfig),
         ClientMessage(id: 12, request: .writeConfig),
+        ClientMessage(id: 13, request: .updateConfig),
     ]
     for message in messages {
         #expect(try roundTrip(message) == message)

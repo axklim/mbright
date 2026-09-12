@@ -16,6 +16,7 @@ enum Describe {
         case let .setConfig(config): return "setConfig \(config)"
         case .reloadConfig: return "reloadConfig"
         case .writeConfig: return "writeConfig"
+        case .updateConfig: return "updateConfig"
         }
     }
 

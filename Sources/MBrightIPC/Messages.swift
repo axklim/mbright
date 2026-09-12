@@ -23,6 +23,10 @@ public enum Request: Equatable, Sendable, Codable {
     case reloadConfig
     /// Creates the file from the current config if none exists.
     case writeConfig
+    /// Re-reads the file and rewrites it with every key this version
+    /// knows: set keys keep their values, missing keys get their defaults,
+    /// unknown keys are dropped. Creates the file if none exists.
+    case updateConfig
 }
 
 public enum Response: Equatable, Sendable, Codable {

@@ -61,5 +61,6 @@ import Testing
     #expect(handler.handle(.setConfig(Config())) == .ok)
     #expect(handler.handle(.reloadConfig) == .ok)
     #expect(handler.handle(.writeConfig) == .ok)
+    #expect(handler.handle(.updateConfig) == .ok)
     #expect(backend.writes.isEmpty)
 }

@@ -22,6 +22,11 @@ func debugLine(_ config: Config) -> String {
     return "debug: on, logs in \(abbreviated(directory))/"
 }
 
+func hotkeysLines(_ config: Config) -> String {
+    guard !config.hotkeys.isEmpty else { return "hotkeys: off" }
+    return "hotkeys:\n" + config.hotkeys.map { "  \($0)" }.joined(separator: "\n")
+}
+
 func abbreviated(_ path: String) -> String { (path as NSString).abbreviatingWithTildeInPath }
 
 func describe(_ status: ConfigStatus) -> String {
@@ -32,6 +37,7 @@ func describe(_ status: ConfigStatus) -> String {
         ui: \(status.config.ui ? "menu bar app" : "mbrightd only")
         \(syncLine(status.config))
         \(debugLine(status.config))
+        \(hotkeysLines(status.config))
         """
 }
 

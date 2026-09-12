@@ -46,6 +46,7 @@ enum Describe {
         switch target {
         case .all: return "all"
         case .main: return "main"
+        case .secondary: return "secondary"
         case let .selector(selector): return "'\(selector)'"
         case let .id(id): return "id \(id)"
         }

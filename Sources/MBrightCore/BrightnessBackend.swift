@@ -13,8 +13,11 @@ public protocol BrightnessBackend: Sendable {
 }
 
 /// Which displays a command applies to.
-public enum Target: Equatable, Sendable, Codable {
+public enum Target: Hashable, Sendable, Codable {
     case main
+    /// The first online display that is not main. Produced by hotkeys;
+    /// the CLI never produces it.
+    case secondary
     case all
     case selector(String)
     /// Exactly one display by `CGDirectDisplayID`. Used by clients that

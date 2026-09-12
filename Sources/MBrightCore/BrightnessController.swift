@@ -67,6 +67,11 @@ public struct BrightnessController: Sendable {
             return displays
         case .main:
             return [displays.first(where: \.isMain) ?? displays[0]]
+        case .secondary:
+            guard let display = displays.first(where: { !$0.isMain }) else {
+                throw MBrightError.noMatch(selector: "secondary", available: displays.map(\.name))
+            }
+            return [display]
         case let .selector(selector):
             return [try DisplaySelector.resolve(selector, in: displays)]
         case let .id(id):

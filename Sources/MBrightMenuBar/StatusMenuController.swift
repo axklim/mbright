@@ -11,6 +11,7 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private let settings: SettingsWindowController
     private let debug = DebugLog(url: DebugLog.resolve(name: "mbright-menubar"))
+    private let hotkeys: HotkeyListener
 
     private var rows: [DisplayRow] = []
     private var lastFailure: String?
@@ -21,11 +22,17 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
     /// one would queue behind the daemon rather than track the thumb.
     private var inFlight: Set<CGDirectDisplayID> = []
     private var queued: [CGDirectDisplayID: Int] = [:]
+    /// Hotkey adjusts go one at a time; presses that land while one is
+    /// out are summed per target, so a held key tracks the display
+    /// rather than queueing a request per repeat.
+    private var adjustInFlight = false
+    private var pendingAdjust: [Target: Int] = [:]
 
     public init(connection: DaemonConnection) {
         self.connection = connection
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.settings = SettingsWindowController(connection: connection)
+        self.hotkeys = HotkeyListener(log: { [debug] in debug.log($0) })
         super.init()
 
         if let button = statusItem.button {
@@ -34,6 +41,9 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         menu.delegate = self
         statusItem.menu = menu
+
+        hotkeys.onHotkey = { [weak self] hotkey in self?.hotkeyPressed(hotkey) }
+        hotkeys.onStateChange = { [weak self] state in self?.settings.hotkeyState = state }
 
         connection.onEvent = { [weak self] event in
             guard let self else { return }
@@ -48,20 +58,23 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
                 if config.debug { debug.setEnabled(true) }
                 debug.log("event configChanged \(config)")
                 if !config.debug { debug.setEnabled(false) }
+                hotkeys.update(config.hotkeys)
             }
         }
         connection.onDisconnect = { [weak self] reason in
             self?.debug.log("disconnected: \(reason)")
             self?.lastFailure = reason
         }
-        // The debug setting lives in the daemon; ask on every connect so a
-        // daemon restarted with a different config is followed too.
+        // The debug and hotkey settings live in the daemon; ask on every
+        // connect so a daemon restarted with a different config is
+        // followed too.
         connection.onConnect = { [weak self] in
             guard let self else { return }
             connection.send(.config) { [weak self] response in
                 guard let self, case let .config(status) = response else { return }
                 debug.setEnabled(status.config.debug)
                 debug.log("mbright-menubar \(Version.current) connected, pid \(getpid()), config \(status.config)")
+                hotkeys.update(status.config.hotkeys)
             }
         }
         connection.subscribe()
@@ -132,6 +145,33 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
             if let next = queued.removeValue(forKey: id) {
                 setBrightness(next, for: id)
             }
+        }
+    }
+
+    // MARK: - Hotkeys
+
+    private func hotkeyPressed(_ hotkey: Hotkey) {
+        pendingAdjust[hotkey.display, default: 0] += hotkey.delta
+        sendPendingAdjust()
+    }
+
+    private func sendPendingAdjust() {
+        guard !adjustInFlight, let (target, delta) = pendingAdjust.first else { return }
+        pendingAdjust.removeValue(forKey: target)
+        guard delta != 0 else {
+            sendPendingAdjust()
+            return
+        }
+        adjustInFlight = true
+        debug.log("adjust \(delta) \(target)")
+        connection.send(.adjust(delta: delta, target: target)) { [weak self] response in
+            guard let self else { return }
+            adjustInFlight = false
+            if case let .failure(error) = response {
+                lastFailure = error.description
+                debug.log("adjust \(delta) \(target) failed: \(error)")
+            }
+            sendPendingAdjust()
         }
     }
 

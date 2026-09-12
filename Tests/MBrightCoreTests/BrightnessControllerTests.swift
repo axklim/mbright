@@ -171,3 +171,25 @@ private func controller(
         try sut.get(.id(99))
     }
 }
+
+@Test func secondaryIsTheFirstDisplayThatIsNotMainWhateverItsPosition() throws {
+    let backend = FakeBackend(values: [3: 0.37, 2: 0.49])
+    let (sut, _) = controller(FakeEnumerator([ultrafine, studio]), backend)
+    #expect(try sut.get(.secondary) == 49)
+    #expect(try sut.resolve(.secondary) == [ultrafine])
+}
+
+@Test func secondaryWithOneDisplayIsNoMatch() {
+    let (sut, _) = controller(FakeEnumerator([studio]))
+    #expect(throws: MBrightError.noMatch(selector: "secondary", available: ["Studio Display"])) {
+        try sut.get(.secondary)
+    }
+}
+
+@Test func adjustSecondaryWritesOnlyThatDisplay() throws {
+    let (sut, backend) = controller()
+    try sut.adjust(delta: 10, target: .secondary)
+    #expect(backend.writes.count == 1)
+    #expect(backend.writes[0].id == 2)
+    #expect(backend.writes[0].value == 0.6)
+}

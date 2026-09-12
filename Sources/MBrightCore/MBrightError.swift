@@ -31,6 +31,9 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible, Codable {
     case loginUnavailable(reason: String)
     /// The config file exists but could not be parsed.
     case configInvalid(path: String, reason: String)
+    /// A `hotkeys` entry that does not parse. Surfaces through
+    /// `configInvalid` when it comes from the file.
+    case invalidHotkey(keys: String, reason: String)
 
     public var description: String {
         switch self {
@@ -75,6 +78,8 @@ public enum MBrightError: Error, Equatable, CustomStringConvertible, Codable {
             return "Launch at login needs mbright installed as an app: \(reason). Run 'make install' first."
         case let .configInvalid(path, reason):
             return "Could not read \(path): \(reason)"
+        case let .invalidHotkey(keys, reason):
+            return "Invalid hotkey '\(keys)': \(reason)"
         }
     }
 }

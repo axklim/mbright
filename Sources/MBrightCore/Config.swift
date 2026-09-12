@@ -16,15 +16,21 @@ public struct Config: Equatable, Sendable, Codable {
     public var sync: SyncMode
     /// Writes a debug log under `$XDG_STATE_HOME/mbright/`.
     public var debug: Bool
+    /// Global shortcuts the menu bar app listens for. Empty turns them off.
+    public var hotkeys: [Hotkey]
 
-    public init(login: Bool = false, ui: Bool = true, sync: SyncMode = .off, debug: Bool = false) {
+    public init(
+        login: Bool = false, ui: Bool = true, sync: SyncMode = .off, debug: Bool = false,
+        hotkeys: [Hotkey] = Hotkey.defaults
+    ) {
         self.login = login
         self.ui = ui
         self.sync = sync
         self.debug = debug
+        self.hotkeys = hotkeys
     }
 
-    private enum CodingKeys: String, CodingKey { case login, ui, sync, debug }
+    private enum CodingKeys: String, CodingKey { case login, ui, sync, debug, hotkeys }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -32,6 +38,7 @@ public struct Config: Equatable, Sendable, Codable {
         ui = try container.decodeIfPresent(Bool.self, forKey: .ui) ?? true
         sync = try container.decodeIfPresent(SyncMode.self, forKey: .sync) ?? .off
         debug = try container.decodeIfPresent(Bool.self, forKey: .debug) ?? false
+        hotkeys = try container.decodeIfPresent([Hotkey].self, forKey: .hotkeys) ?? Hotkey.defaults
     }
 }
 

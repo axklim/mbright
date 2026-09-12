@@ -48,6 +48,7 @@ BINDIR := $(call tilde,$(BINDIR))
 
 # Written by mbrightd from the config's login key; launchd reads only this path.
 LAUNCH_AGENT_LABEL := com.axklim.mbright
+BUNDLE_ID          := com.axklim.mbright
 LAUNCH_AGENT       := $(HOME)/Library/LaunchAgents/$(LAUNCH_AGENT_LABEL).plist
 
 # The pre-config-file label. mbrightd never writes this one; uninstall only
@@ -123,6 +124,9 @@ clean: ## Remove build products (fetched dependencies are kept)
 	swift package clean $(SWIFT_FLAGS)
 	swift package clean
 
+# The bundle is ad-hoc signed, so every build is a new binary to TCC and a
+# stale Accessibility grant would show as allowed while the hotkey tap is
+# refused. Dropping it makes the app ask again on launch.
 install: build-release ## Build, stop anything running, install the app bundle, launch it
 	@$(call stop,$(BUILD_DIR)/release,$(APP_HELPERS))
 	@mkdir -p "$(APP_BIN)" "$(APP_HELPERS)" "$(BINDIR)"
@@ -133,6 +137,7 @@ install: build-release ## Build, stop anything running, install the app bundle, 
 	@sed "s/@VERSION@/$$("$(BUILD_DIR)/release/mbright" --version)/g" \
 	  scripts/Info.plist.in > "$(APP)/Contents/Info.plist"
 	@ln -sfn "$(APP_BIN)/mbright" "$(BINDIR)/mbright"
+	@tccutil reset Accessibility $(BUNDLE_ID) >/dev/null 2>&1 || true
 	@echo "installed $(APP)"
 	@echo "installed $(BINDIR)/mbright -> $(APP_BIN)/mbright"
 	@open -a "$(APP)"

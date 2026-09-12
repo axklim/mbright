@@ -62,7 +62,9 @@ Full reference: [docs/cli.md](docs/cli.md). How it fits together:
   Not DDC/CI; DDC/CI-only monitors are not expected to work.
 - `set 0` makes a display look off. Treat it as a footgun.
 - Keyboard shortcuts need Accessibility access, and macOS ties the grant
-  to the exact binary: after `make install` of a new build, allow it again.
+  to the exact binary. `make install` drops the old grant so the app asks
+  again on launch; allow it in System Settings > Privacy & Security >
+  Accessibility.
 
 ## Development
 

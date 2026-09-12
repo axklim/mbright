@@ -124,6 +124,12 @@ the next login.
 login: disabled
 ui: menu bar app
 sync: off
+debug: off
+hotkeys:
+  lopt+f1  main down 10
+  lopt+f2  main up 10
+  ropt+f1  secondary down 10
+  ropt+f2  secondary up 10
 ```
 
 `config init` writes that file once and never overwrites it. `config
@@ -131,6 +137,54 @@ reload` re-reads it after a hand edit and prints the same block; a
 malformed file is an error and the daemon keeps its previous settings.
 Only `mbrightd` touches the file, so every config command needs a running
 daemon or `--daemon-autostart`.
+
+## Keyboard shortcuts
+
+The menu bar app listens for the shortcuts in the config's `hotkeys`
+list. The default is Left Option + F1/F2 for the main display and Right
+Option + F1/F2 for the secondary display (the first one that is not
+main), 10 points per press; holding the key repeats. Shortcuts need
+Accessibility access for mbright (System Settings > Privacy & Security >
+Accessibility); the app asks once and Settings shows a button while it is
+missing. On Apple keyboards F1 and F2 are the brightness keys unless "Use
+F1, F2, etc. keys as standard function keys" is on; otherwise hold Fn as
+well.
+
+To change them, `mbright config init` once, edit the file, then `mbright
+config reload`:
+
+```json
+"hotkeys": [
+  { "keys": "lopt+f1", "action": "down", "display": "main" },
+  { "keys": "lopt+f2", "action": "up",   "display": "main" },
+  { "keys": "ropt+f1", "action": "down", "display": "secondary" },
+  { "keys": "ropt+f2", "action": "up",   "display": "secondary" }
+]
+```
+
+| Field | Values | Default |
+| --- | --- | --- |
+| `keys` | modifiers and one key joined by `+` | required |
+| `action` | `up`, `down` | required |
+| `display` | `main`, `secondary`, `all`, or a `--display` selector | `main` |
+| `step` | 1 to 100 | 10 |
+
+`keys` is case-insensitive. Modifiers: `cmd`, `ctrl`, `opt`, `shift`
+(`command`, `control`, `option`, `alt` also work), each optionally
+prefixed with `l` or `r` for one side only: `lopt`, `ropt`, `rcmd`,
+`lshift`, ... An unsided modifier accepts either key. Keys: `f1` to
+`f20`, `a` to `z`, `0` to `9`, `up`, `down`, `left`, `right`, `space`,
+`tab`, `return`, `escape`, `delete`, `forwarddelete`, `home`, `end`,
+`pageup`, `pagedown`, and `-` `=` `[` `]` `\` `;` `'` `,` `.` `/` `` ` ``.
+Letters name the key at that position on a US layout. Anything but an
+F-key needs at least one modifier. The other modifiers must not be held:
+`lopt+f1` does not fire for Shift + Left Option + F1. Fn and Caps Lock
+are ignored.
+
+`"hotkeys": []` turns shortcuts off. A file with a binding that does not
+parse is rejected as a whole by `config reload`, naming the binding, and
+the daemon keeps its previous settings. Shortcuts need the menu bar app;
+`enable-login --no-ui` starts no listener.
 
 ## Menu bar app
 

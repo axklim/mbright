@@ -2,8 +2,20 @@ import Foundation
 import Testing
 @testable import MBrightCore
 
-@Test func configDefaultsAreLoginOffUIOnSyncOffDebugOff() {
-    #expect(Config() == Config(login: false, ui: true, sync: .off, debug: false))
+@Test func configDefaultsAreLoginOffUIOnSyncOffDebugOffDefaultHotkeys() {
+    #expect(Config() == Config(login: false, ui: true, sync: .off, debug: false, hotkeys: Hotkey.defaults))
+}
+
+@Test func configDecodesHotkeysAndTreatsMissingAsDefaultsAndEmptyAsOff() throws {
+    let decoder = JSONDecoder()
+    #expect(try decoder.decode(Config.self, from: Data("{}".utf8)).hotkeys == Hotkey.defaults)
+    #expect(try decoder.decode(Config.self, from: Data(#"{"hotkeys": []}"#.utf8)).hotkeys == [])
+    let json = #"{"hotkeys": [{"keys": "cmd+f5", "action": "up", "display": "all", "step": 25}]}"#
+    #expect(try decoder.decode(Config.self, from: Data(json.utf8)).hotkeys
+        == [Hotkey(keys: try KeyCombination(parsing: "cmd+f5"), action: .up, display: .all, step: 25)])
+    #expect(throws: MBrightError.invalidHotkey(keys: "cmd+f99", reason: "unknown key 'f99'")) {
+        try decoder.decode(Config.self, from: Data(#"{"hotkeys": [{"keys": "cmd+f99", "action": "up"}]}"#.utf8))
+    }
 }
 
 @Test func configDecodesDebug() throws {
@@ -38,7 +50,8 @@ import Testing
     #expect(object?["ui"] as? Bool == false)
     #expect(object?["sync"] as? String == "relative")
     #expect(object?["debug"] as? Bool == true)
-    #expect(object?.count == 4)
+    #expect((object?["hotkeys"] as? [[String: Any]])?.count == 4)
+    #expect(object?.count == 5)
 }
 
 @Test func configStatusRoundTrips() throws {

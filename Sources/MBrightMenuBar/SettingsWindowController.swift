@@ -11,9 +11,20 @@ final class SettingsWindowController {
     private let launchAtLogin = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
     private let syncButtons: [NSButton]
     private let syncHint = NSTextField(wrappingLabelWithString: "")
+    private let shortcuts = NSTextField(wrappingLabelWithString: "")
+    private let shortcutsHint = NSTextField(wrappingLabelWithString: "")
+    private let accessibility = NSTextField(wrappingLabelWithString: "")
+    private let openAccessibility = NSButton(title: "Open Accessibility Settings…", target: nil, action: nil)
     private let status = NSTextField(wrappingLabelWithString: "")
+    private let stack = NSStackView()
     private let connection: DaemonConnection
     private var current = Config()
+    private var configPath = "~/.config/mbright/config.json"
+
+    /// Pushed by the hotkey listener; the window only shows it.
+    var hotkeyState: HotkeyListener.State = .off {
+        didSet { render() }
+    }
 
     private static let syncTitles: [SyncMode: String] = [
         .off: "Off",
@@ -71,16 +82,36 @@ final class SettingsWindowController {
         status.preferredMaxLayoutWidth = 340
         status.stringValue = "Launch at login takes effect at the next login."
 
+        let shortcutsLabel = NSTextField(labelWithString: "Keyboard shortcuts")
+        shortcuts.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        shortcuts.preferredMaxLayoutWidth = 340
+        for hint in [shortcutsHint, accessibility] {
+            hint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+            hint.textColor = .secondaryLabelColor
+            hint.preferredMaxLayoutWidth = 340
+        }
+        accessibility.stringValue = "Shortcuts need Accessibility access for mbright. Allow it, then they start working."
+        openAccessibility.target = self
+        openAccessibility.action = #selector(showAccessibilitySettings)
+        openAccessibility.controlSize = .small
+
         let version = NSTextField(labelWithString: "mbright \(Version.current)")
         version.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         version.textColor = .tertiaryLabelColor
 
-        let stack = NSStackView(views: [launchAtLogin, syncLabel, radios, syncHint, status, version])
+        for view in [
+            launchAtLogin, syncLabel, radios, syncHint,
+            shortcutsLabel, shortcuts, shortcutsHint, accessibility, openAccessibility,
+            status, version,
+        ] {
+            stack.addArrangedSubview(view)
+        }
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
         stack.setCustomSpacing(16, after: launchAtLogin)
         stack.setCustomSpacing(16, after: syncHint)
+        stack.setCustomSpacing(16, after: openAccessibility)
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
@@ -94,7 +125,7 @@ final class SettingsWindowController {
             stack.widthAnchor.constraint(equalToConstant: 380),
         ])
         window.contentView = content
-        window.setContentSize(stack.fittingSize)
+        render()
     }
 
     func show() {
@@ -120,6 +151,10 @@ final class SettingsWindowController {
         send(config)
     }
 
+    @objc private func showAccessibilitySettings() {
+        HotkeyListener.openAccessibilitySettings()
+    }
+
     /// Only the changed key differs from what the daemon last reported, so
     /// the other keys survive a change made elsewhere in the meantime.
     private func send(_ config: Config) {
@@ -141,6 +176,7 @@ final class SettingsWindowController {
         switch response {
         case let .config(configStatus):
             current = configStatus.config
+            configPath = (configStatus.path as NSString).abbreviatingWithTildeInPath
             status.stringValue = "Launch at login takes effect at the next login."
         case let .failure(error):
             status.stringValue = "\(error)"
@@ -152,5 +188,19 @@ final class SettingsWindowController {
             syncButtons[index].state = mode == current.sync ? .on : .off
         }
         syncHint.stringValue = Self.syncHints[current.sync] ?? ""
+        render()
+    }
+
+    /// The shortcut section follows the daemon's config and the
+    /// listener's state; the window grows and shrinks with it.
+    private func render() {
+        shortcuts.stringValue = current.hotkeys.isEmpty
+            ? "Off"
+            : current.hotkeys.map(\.description).joined(separator: "\n")
+        shortcutsHint.stringValue = "Edit hotkeys in \(configPath), then run 'mbright config reload'."
+        let needsAccess = hotkeyState == .needsAccessibility
+        accessibility.isHidden = !needsAccess
+        openAccessibility.isHidden = !needsAccess
+        window.setContentSize(stack.fittingSize)
     }
 }

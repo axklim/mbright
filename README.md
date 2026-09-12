@@ -1,8 +1,9 @@
 # mbright
 
 Brightness control for macOS displays that ignore DDC/CI, such as the Apple
-Studio Display and LG UltraFine. Command line and menu bar. Goes through
-Apple's own `DisplayServices` layer: no root, no permission prompts.
+Studio Display and LG UltraFine. Command line, menu bar and keyboard
+shortcuts. Goes through Apple's own `DisplayServices` layer: no root, and
+the only permission prompt is Accessibility access for the shortcuts.
 
 ## Install
 
@@ -37,6 +38,10 @@ mbright daemon enable-login   # start at login (also in the app's Settings)
 open -a mbright               # menu bar app with a slider per display
 ```
 
+With the menu bar app running, Left Option + F1/F2 adjusts the main
+display and Right Option + F1/F2 the second one. The keys are in the
+config file; see [docs/cli.md](docs/cli.md).
+
 The CLI needs `mbrightd` running. Start it once, or pass `--daemon-autostart`
 to any command. The menu bar app starts it by itself.
 
@@ -55,6 +60,8 @@ Full reference: [docs/cli.md](docs/cli.md). How it fits together:
 - Tested only with a Studio Display and an LG UltraFine on Apple Silicon.
   Not DDC/CI; DDC/CI-only monitors are not expected to work.
 - `set 0` makes a display look off. Treat it as a footgun.
+- Keyboard shortcuts need Accessibility access, and macOS ties the grant
+  to the exact binary: after `make install` of a new build, allow it again.
 
 ## Development
 
